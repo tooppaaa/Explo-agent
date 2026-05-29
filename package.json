@@ -1,0 +1,19 @@
+{
+  "name": "code-mode-engine",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "pnpm -r build",
+    "dev:mock": "pnpm --filter mock-api dev",
+    "dev:server": "pnpm --filter mcp-server dev",
+    "dev:chat": "pnpm --filter chat-backend dev",
+    "dev:widget": "pnpm --filter widget dev"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
