@@ -23,6 +23,16 @@ interface IndexedDoc {
   name: string;
   description: string;
   paramNames: string;
+  /** Mots dérivés du nom (camelCase décomposé), ex. "list orders". */
+  terms: string;
+}
+
+/** Décompose un identifiant camelCase / dotted en mots minuscules. */
+function splitIdentifier(name: string): string {
+  return name
+    .replace(/[._-]/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase();
 }
 
 export class Bm25Search implements SearchBackend {
@@ -33,12 +43,13 @@ export class Bm25Search implements SearchBackend {
   constructor(operations: Operation[], defaultTopK = 8) {
     this.defaultTopK = defaultTopK;
     this.mini = new MiniSearch<IndexedDoc>({
-      fields: ["name", "description", "paramNames"],
+      fields: ["name", "terms", "description", "paramNames"],
       storeFields: ["name"],
       searchOptions: {
-        boost: { name: 2 },
+        boost: { name: 2, terms: 2 },
         prefix: true,
         fuzzy: 0.2,
+        combineWith: "OR",
       },
     });
 
@@ -49,6 +60,7 @@ export class Bm25Search implements SearchBackend {
         name: op.name,
         description: op.description,
         paramNames: op.http.params.map((p) => p.name).join(" "),
+        terms: splitIdentifier(op.name),
       };
     });
     this.mini.addAll(docs);
