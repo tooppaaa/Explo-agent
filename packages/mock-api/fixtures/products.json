@@ -1,0 +1,7 @@
+[
+  { "id": "p1", "name": "Widget Pro", "category": "hardware", "price": 149.99, "stock": 200 },
+  { "id": "p2", "name": "DataSync Kit", "category": "software", "price": 49.99, "stock": 999 },
+  { "id": "p3", "name": "Cloud Adapter", "category": "hardware", "price": 89.99, "stock": 75 },
+  { "id": "p4", "name": "Analytics Suite", "category": "software", "price": 299.99, "stock": 999 },
+  { "id": "p5", "name": "USB-C Hub", "category": "hardware", "price": 39.99, "stock": 430 }
+]

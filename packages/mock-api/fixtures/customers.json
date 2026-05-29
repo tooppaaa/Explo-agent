@@ -1,0 +1,7 @@
+[
+  { "id": "c1", "name": "Acme Corp", "region": "EMEA", "tier": "enterprise", "since": "2021-03-12" },
+  { "id": "c2", "name": "Globex", "region": "AMER", "tier": "smb", "since": "2022-07-01" },
+  { "id": "c3", "name": "Initech", "region": "AMER", "tier": "enterprise", "since": "2020-11-23" },
+  { "id": "c4", "name": "Umbrella", "region": "APAC", "tier": "smb", "since": "2023-01-15" },
+  { "id": "c5", "name": "Hooli", "region": "EMEA", "tier": "enterprise", "since": "2019-05-30" }
+]
