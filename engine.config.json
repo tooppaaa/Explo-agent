@@ -1,0 +1,13 @@
+{
+  "providers": [
+    {
+      "name": "mock",
+      "openapi": "packages/mock-api/openapi.yaml",
+      "baseUrl": "http://localhost:3001"
+    }
+  ],
+  "sandbox": { "runtime": "deno", "timeoutMs": 5000, "memoryMb": 128 },
+  "search": { "backend": "bm25", "topK": 8 },
+  "mutations": { "mode": "intent" },
+  "results": { "maxBytes": 32000 }
+}
