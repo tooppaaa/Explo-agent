@@ -13,6 +13,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
     "catalogue": "workspace:*",
+    "dotenv": "^17.4.2",
     "express": "^4.19.0",
     "sandbox": "workspace:*",
     "search": "workspace:*",

@@ -15,6 +15,7 @@
     "ai": "^6.0.0",
     "catalogue": "workspace:*",
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
     "express": "^4.19.0",
     "mcp-server": "workspace:*",
     "zod": "^3.23.0"
