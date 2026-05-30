@@ -1,4 +1,5 @@
 import type { ApiProvider, HostBridge, Operation } from "catalogue";
+import { dbg } from "./debug.js";
 
 /**
  * HostBridge (PRD §6.6, §8) — côté serveur de confiance.
@@ -122,7 +123,10 @@ export class HttpHostBridge implements HostBridge {
     }
 
     // 4. HTTP côté serveur.
+    const t0 = Date.now();
+    dbg("bridge→", `${op.http.method.toUpperCase()} ${url.pathname}${url.search}`);
     const res = await this.fetchImpl(url.toString(), init);
+    dbg("bridge←", `${res.status} (${Date.now() - t0}ms)`);
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} from ${op.name}`);
     }
