@@ -10,27 +10,45 @@ interface Props {
 export function MessageView({ message, onAction }: Props) {
   const text = extractText(message as never);
   const outputs = extractExecuteOutputs(message as never);
+  const isUser = message.role === "user";
+
+  if (isUser) {
+    return (
+      <div className="cme-msg cme-msg-user">
+        {text && <div className="cme-text">{text}</div>}
+      </div>
+    );
+  }
 
   return (
-    <div className={`cme-msg cme-msg-${message.role}`}>
-      {text && <div className="cme-text">{text}</div>}
-      {outputs.map((out, i) => {
-        if (!out.ok) {
-          return (
-            <div key={i} className="cme-error">
-              Erreur sandbox : {out.error?.message ?? "inconnue"}
-            </div>
-          );
-        }
-        if (out.ui) {
-          return <ArtifactRenderer key={i} ui={out.ui} onAction={onAction} />;
-        }
-        return (
-          <pre key={i} className="cme-result">
-            {JSON.stringify(out.result, null, 2)}
-          </pre>
-        );
-      })}
+    <div className="cme-msg cme-msg-assistant">
+      <div className="cme-assistant-row">
+        <div className="cme-avatar">🤖</div>
+        <div className="cme-assistant-content">
+          {text && <div className="cme-text">{text}</div>}
+          {outputs.map((out, i) => {
+            if (!out.ok) {
+              return (
+                <div key={i} className="cme-error">
+                  ⚠ {out.error?.message ?? "Erreur inconnue"}
+                </div>
+              );
+            }
+            if (out.ui) {
+              return (
+                <div key={i} className="cme-artifact-card">
+                  <ArtifactRenderer ui={out.ui} onAction={onAction} />
+                </div>
+              );
+            }
+            return (
+              <pre key={i} className="cme-result">
+                {JSON.stringify(out.result, null, 2)}
+              </pre>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
