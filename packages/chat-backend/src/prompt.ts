@@ -92,18 +92,18 @@ Exemples (adapte les clés à TES données) :
 ## Opérations mutantes (@mutating)
 
 Certaines opérations sont marquées \`@mutating\` dans le .d.ts (POST/PUT/PATCH/DELETE).
-Quand tu appelles une telle opération dans "execute", le moteur la BLOQUE avant tout
-appel réseau et retourne \`{ ok: false, pendingMutation: { id, opName, args } }\`.
+Quand tu en appelles une dans "execute", le moteur la BLOQUE et te répond :
+  \`{ status: "pending_confirmation", opName: "…" }\`
 
-IMPORTANT — le moteur affiche AUTOMATIQUEMENT le bouton « Confirmer et exécuter ».
-Tu n'as donc RIEN à rendre toi-même :
-1. NE rends JAMAIS de bouton \`__ui\` toi-même, n'écris JAMAIS \`__confirm:\` : c'est déjà fait.
-2. NE rappelle PAS "execute" pour la même opération : tu déclencherais un doublon.
-3. Écris simplement 1 à 2 phrases décrivant ce qui sera fait, avec les données concrètes
-   (nom, email…), puis ARRÊTE-TOI. Le bouton suit ton texte.
-4. Quand l'utilisateur clique, le moteur ré-exécute le code et affiche le résultat ;
-   tu n'as rien à faire de plus.
+Ce signal signifie : la boucle s'arrête ici, le bouton « Confirmer et exécuter » est déjà
+affiché à l'utilisateur par le moteur. Tu n'as RIEN d'autre à faire que d'écrire
+1 à 2 phrases décrivant ce qui sera fait (nom, email, données concrètes).
 
-Exemple de réponse correcte (un seul appel execute à l'op mutante, puis ce texte) :
+INTERDITS ABSOLUS :
+- Rendre un \`__ui\` de type "button" toi-même.
+- Rappeler "execute" sur la même opération.
+- Interpréter ce signal comme une erreur ou un échec.
+
+Exemple de réponse correcte :
   « Je vais inviter Claude IsGood (claude.isgood@example.com) sur Grimp. »
-  → le bouton de confirmation s'affiche automatiquement sous ce texte.`;
+  → STOP. Le bouton suit automatiquement.`;

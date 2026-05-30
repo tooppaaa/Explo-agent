@@ -56,6 +56,7 @@ export function buildAiTools(engine: Engine): ToolSet {
         const result = await engine.execute(code);
         if (result.logs?.length) dbg("sandbox│log", result.logs.join("\n"));
         if (result.ok) dbg("execute←", `ok  ui=${result.ui?.type ?? "none"}`, JSON.stringify(result.result)?.slice(0, 200));
+        else if (result.pendingMutation) dbg("execute←", `pending  op=${result.pendingMutation.opName}`);
         else dbg("execute←", `\x1b[31merror\x1b[0m`, result.error?.message);
         annotate({
           generated_code: code,
@@ -65,6 +66,14 @@ export function buildAiTools(engine: Engine): ToolSet {
           ...(result.logs?.length ? { logs: result.logs.join("\n") } : {}),
           ...(result.ok ? {} : { error: result.error?.message ?? "" }),
         });
+        // Mutation bloquée : on renvoie un signal neutre au LLM — pas `ok:false`,
+        // qui serait lu comme un échec et déclencherait un retry. La boucle est
+        // stoppée structurellement par la condition `hasPendingMutation` dans
+        // streamText. Le modèle n'a donc ni besoin de réessayer ni de rendre
+        // un bouton (le moteur l'a déjà émis via ui:{type:"button"}).
+        if (result.pendingMutation) {
+          return { status: "pending_confirmation", opName: result.pendingMutation.opName };
+        }
         return result;
       },
     }),

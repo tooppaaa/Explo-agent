@@ -95,6 +95,54 @@ describe("chat backend — orchestration LLM + tools", () => {
     expect(body).toContain("EMEA");
   });
 
+  it("stoppe la boucle après pending_confirmation (une seule étape, pas de retry)", async () => {
+    const engine = await createEngine({
+      providers: [{ name: "mock", openapi: specPath, baseUrl }],
+    });
+    // createOrder est mutant → le moteur retourne pending_confirmation au LLM.
+    const mutatingCode =
+      "return await api.mock.createOrder({ body: { customerId: 'c1', region: 'EMEA', items: [] } });";
+    let callCount = 0;
+    const model = new MockLanguageModelV3({
+      doStream: async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: "stream-start", warnings: [] },
+                { type: "tool-call", toolCallId: "t1", toolName: "execute", input: JSON.stringify({ code: mutatingCode }) },
+                { type: "finish", finishReason: "tool-calls", usage: USAGE },
+              ] as never,
+            }),
+          };
+        }
+        // Ce second appel NE DOIT PAS arriver — la boucle doit s'être arrêtée.
+        return {
+          stream: simulateReadableStream({
+            chunks: [
+              { type: "stream-start", warnings: [] },
+              { type: "text-start", id: "x" },
+              { type: "text-delta", id: "x", delta: "Retry inattendu." },
+              { type: "text-end", id: "x" },
+              { type: "finish", finishReason: "stop", usage: USAGE },
+            ] as never,
+          }),
+        };
+      },
+    });
+    const handler = createChatHandler(engine, { model });
+    const response = await handler([userMessage("crée une commande")]);
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    // Le flux ne doit PAS contenir le texte du second appel LLM.
+    expect(body).not.toContain("Retry inattendu.");
+    // Le signal pending_confirmation doit apparaître dans le flux.
+    expect(body).toContain("pending_confirmation");
+    // Le modèle n'a été appelé qu'une seule fois (le loop s'est arrêté).
+    expect(callCount).toBe(1);
+  });
+
   it("propage proprement une erreur du sandbox dans le flux (pas de crash)", async () => {
     const engine = await createEngine({
       providers: [{ name: "mock", openapi: specPath, baseUrl }],
