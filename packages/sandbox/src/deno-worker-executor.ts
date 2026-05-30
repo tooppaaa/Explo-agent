@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { homedir } from "node:os";
 import type { ExecOpts, HostBridge, RawExecResult, SandboxExecutor } from "catalogue";
 
 /**
@@ -47,6 +48,16 @@ export class DenoWorkerExecutor implements SandboxExecutor {
 
   execute(code: string, bridge: HostBridge, opts: ExecOpts): Promise<RawExecResult> {
     return new Promise<RawExecResult>((resolve) => {
+      // Enrichit le PATH avec les emplacements d'install courants de Deno
+      // (~/.deno/bin, /usr/local/bin) au cas où ils seraient absents du PATH
+      // du process Node (fréquent en environnement conteneurisé ou CI).
+      const denoPath = [
+        process.env.PATH ?? "",
+        join(homedir(), ".deno", "bin"),
+        "/usr/local/bin",
+        "/usr/bin",
+      ].join(":");
+
       const child: ChildProcessWithoutNullStreams = spawn(
         this.denoPath,
         [
@@ -56,7 +67,7 @@ export class DenoWorkerExecutor implements SandboxExecutor {
           `--v8-flags=--max-old-space-size=${opts.memoryMb}`,
           HOST_SCRIPT,
         ],
-        { stdio: ["pipe", "pipe", "pipe"] },
+        { stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, PATH: denoPath } },
       );
 
       let settled = false;
