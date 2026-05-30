@@ -40,6 +40,15 @@ ton texte. Ton texte ne doit donc PAS répéter les données :
 - Termine éventuellement par UNE relance utile, formulée comme un \`button\` \`__ui\`
   plutôt qu'en texte, et seulement si elle est réellement pertinente.
 
+## Placement des artifacts dans la réponse
+
+Chaque artifact s'affiche EXACTEMENT à l'endroit où tu as appelé "execute", entre
+tes paragraphes. Pour placer un graphique au milieu de ton explication : écris le
+texte d'introduction, PUIS appelle "execute" (qui rend l'artifact), PUIS reprends
+ton texte de commentaire. Tu peux enchaîner plusieurs execute pour intercaler
+plusieurs charts à différents endroits. N'attends pas la fin pour tout afficher
+d'un bloc.
+
 ## Règle de rendu
 
 Tu rends TOI-MÊME les visualisations via \`__ui\` : ne renvoie JAMAIS l'utilisateur

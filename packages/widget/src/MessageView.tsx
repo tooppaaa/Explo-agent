@@ -1,5 +1,5 @@
 import type { UIMessage } from "ai";
-import { extractText, extractExecuteOutputs } from "./extract.js";
+import { extractText, extractOrderedItems } from "./extract.js";
 import { ArtifactRenderer } from "./ArtifactRenderer.js";
 
 interface Props {
@@ -8,11 +8,10 @@ interface Props {
 }
 
 export function MessageView({ message, onAction }: Props) {
-  const text = extractText(message);
-  const outputs = extractExecuteOutputs(message);
   const isUser = message.role === "user";
 
   if (isUser) {
+    const text = extractText(message);
     return (
       <div className="cme-msg cme-msg-user">
         {text && <div className="cme-text">{text}</div>}
@@ -20,13 +19,22 @@ export function MessageView({ message, onAction }: Props) {
     );
   }
 
+  // Rendu DANS L'ORDRE de production (texte / artifact / texte…) : un chart se
+  // place ainsi là où le modèle l'a inséré, et non systématiquement en bas.
+  const items = extractOrderedItems(message);
+
   return (
     <div className="cme-msg cme-msg-assistant">
       <div className="cme-assistant-row">
         <div className="cme-avatar">🤖</div>
         <div className="cme-assistant-content">
-          {text && <div className="cme-text">{text}</div>}
-          {outputs.map((out, i) => {
+          {items.map((item, i) => {
+            if (item.kind === "text") {
+              return item.text ? (
+                <div key={i} className="cme-text">{item.text}</div>
+              ) : null;
+            }
+            const out = item.output;
             if (!out.ok) {
               return (
                 <div key={i} className="cme-error" role="alert">

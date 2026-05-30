@@ -5,6 +5,7 @@ import { act } from "react-dom/test-utils";
 import {
   extractText,
   extractExecuteOutputs,
+  extractOrderedItems,
 } from "../packages/widget/src/extract.js";
 import { initAgent } from "../packages/widget/src/index.js";
 import { ArtifactRenderer } from "../packages/widget/src/ArtifactRenderer.js";
@@ -55,6 +56,26 @@ describe("widget — extraction d'artifacts (purs)", () => {
     };
     const outs = extractExecuteOutputs(msg);
     expect(outs[0].ui?.type).toBe("metric");
+  });
+
+  it("extractOrderedItems conserve l'ordre texte / artifact / texte", () => {
+    const msg = {
+      role: "assistant",
+      parts: [
+        { type: "text", text: "Voici la répartition :" },
+        {
+          type: "tool-execute",
+          state: "output-available",
+          output: { ok: true, ui: { type: "pie-chart", nameKey: "t", valueKey: "v", data: [{ t: "a", v: 1 }] } },
+        },
+        { type: "text", text: "Le segment A domine." },
+      ],
+    };
+    const items = extractOrderedItems(msg);
+    expect(items.map((i) => i.kind)).toEqual(["text", "artifact", "text"]);
+    expect(items[0]).toMatchObject({ kind: "text", text: "Voici la répartition :" });
+    expect(items[1]).toMatchObject({ kind: "artifact" });
+    expect(items[2]).toMatchObject({ kind: "text", text: "Le segment A domine." });
   });
 
   it("extractExecuteOutputs retourne ok:false en cas d'erreur", () => {

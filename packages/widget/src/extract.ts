@@ -40,3 +40,31 @@ export function extractExecuteOutputs(message: UIMessage): ExecuteOutput[] {
     )
     .map((p) => p.output as ExecuteOutput);
 }
+
+/**
+ * Un fragment de message à rendre, dans l'ORDRE où le modèle l'a produit :
+ * texte et artifacts intercalés. C'est ce qui permet de placer un chart « au
+ * milieu » du texte — le modèle écrit du texte, appelle `execute` (→ artifact),
+ * puis reprend son texte. On s'appuie sur l'ordre natif de `message.parts`
+ * (le SDK conserve la séquence des deltas texte et des tool calls), sans
+ * marqueurs ni parsing fragile.
+ */
+export type MessageItem =
+  | { kind: "text"; text: string }
+  | { kind: "artifact"; output: ExecuteOutput };
+
+export function extractOrderedItems(message: UIMessage): MessageItem[] {
+  const items: MessageItem[] = [];
+  for (const p of parts(message)) {
+    if (p.type === "text" && typeof p.text === "string" && p.text.length > 0) {
+      items.push({ kind: "text", text: p.text });
+    } else if (
+      (p.type === "tool-execute" || p.type === "dynamic-tool") &&
+      p.state === "output-available" &&
+      p.output != null
+    ) {
+      items.push({ kind: "artifact", output: p.output as ExecuteOutput });
+    }
+  }
+  return items;
+}
