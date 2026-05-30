@@ -5,6 +5,7 @@ import { Readable } from "node:stream";
 import express, { type Express } from "express";
 import cors from "cors";
 import { anthropic } from "@ai-sdk/anthropic";
+import { createMistral } from "@ai-sdk/mistral";
 import { createEngine, type Engine } from "mcp-server";
 import { loadConfigFromFile, type EngineConfig } from "catalogue";
 import { createChatHandler } from "./chat.js";
@@ -41,6 +42,23 @@ export function createChatApp(options: ChatServerOptions): Express {
   return app;
 }
 
+function defaultModel(provider: string): string {
+  if (provider === "mistral") return "mistral-medium-latest";
+  return "claude-sonnet-4-5";
+}
+
+function resolveModel(provider: string, modelId: string): LanguageModel {
+  switch (provider) {
+    case "mistral": {
+      const mistral = createMistral({ apiKey: process.env.MISTRAL_API_KEY });
+      return mistral(modelId);
+    }
+    case "anthropic":
+    default:
+      return anthropic(modelId);
+  }
+}
+
 /** Pipe une Web Response (stream) vers une réponse Express. */
 async function pipeWebResponse(
   response: Response,
@@ -68,14 +86,15 @@ if (isMain) {
     console.warn(`[chat-backend] no config at ${configPath}, empty mode`);
   }
 
-  const modelId = process.env.CHAT_MODEL ?? "claude-sonnet-4-5";
+  const provider = process.env.CHAT_PROVIDER ?? "anthropic";
+  const modelId = process.env.CHAT_MODEL ?? defaultModel(provider);
   const port = Number(process.env.CHAT_PORT ?? 3000);
 
   createEngine(config).then((engine) => {
-    const app = createChatApp({ engine, model: anthropic(modelId) });
+    const app = createChatApp({ engine, model: resolveModel(provider, modelId) });
     app.listen(port, () => {
       // eslint-disable-next-line no-console
-      console.log(`[chat-backend] listening on http://localhost:${port} (model: ${modelId})`);
+      console.log(`[chat-backend] listening on http://localhost:${port} (${provider}/${modelId})`);
     });
   });
 }
