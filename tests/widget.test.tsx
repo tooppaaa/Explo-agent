@@ -6,6 +6,7 @@ import {
   extractText,
   extractExecuteOutputs,
   extractOrderedItems,
+  hasRenderableData,
 } from "../packages/widget/src/extract.js";
 import { initAgent } from "../packages/widget/src/index.js";
 import { ArtifactRenderer } from "../packages/widget/src/ArtifactRenderer.js";
@@ -77,6 +78,17 @@ describe("widget — extraction d'artifacts (purs)", () => {
     expect(items[0]).toMatchObject({ kind: "text", text: "Voici la répartition :" });
     expect(items[1]).toMatchObject({ kind: "artifact" });
     expect(items[2]).toMatchObject({ kind: "text", text: "Le segment A domine." });
+  });
+
+  it("hasRenderableData : false sur un chart/table sans données, true sinon", () => {
+    expect(hasRenderableData({ type: "pie-chart", nameKey: "t", valueKey: "v", data: [] })).toBe(false);
+    expect(hasRenderableData({ type: "bar-chart", xKey: "x", valueKeys: ["y"], data: [] })).toBe(false);
+    expect(hasRenderableData({ type: "table", data: [] })).toBe(false);
+    expect(hasRenderableData({ type: "pie-chart", nameKey: "t", valueKey: "v", data: [{ t: "a", v: 1 }] })).toBe(true);
+    expect(hasRenderableData({ type: "metric-grid", items: [] })).toBe(false);
+    // metric / button : pas de tableau de données → toujours affichables.
+    expect(hasRenderableData({ type: "metric", label: "CA", value: 1 })).toBe(true);
+    expect(hasRenderableData({ type: "button", label: "Go", action: "x" })).toBe(true);
   });
 
   it("extractExecuteOutputs retourne ok:false en cas d'erreur", () => {

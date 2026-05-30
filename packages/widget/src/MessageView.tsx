@@ -1,5 +1,5 @@
 import type { UIMessage } from "ai";
-import { extractText, extractOrderedItems } from "./extract.js";
+import { extractText, extractOrderedItems, hasRenderableData } from "./extract.js";
 import { ArtifactRenderer } from "./ArtifactRenderer.js";
 import { Markdown } from "./Markdown.js";
 
@@ -46,6 +46,8 @@ export function MessageView({ message, onAction }: Props) {
               );
             }
             if (out.ui) {
+              // Pas de cadre vide : on n'affiche un chart/table que s'il a des données.
+              if (!hasRenderableData(out.ui)) return null;
               return (
                 <div key={i} className="cme-artifact-card">
                   <ArtifactRenderer ui={out.ui} onAction={onAction} />

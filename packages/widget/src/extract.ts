@@ -68,3 +68,23 @@ export function extractOrderedItems(message: UIMessage): MessageItem[] {
   }
   return items;
 }
+
+/**
+ * Un artifact a-t-il de quoi être affiché ? Un chart/table sans données (data
+ * vide ou absente) ne doit PAS être rendu : il afficherait un cadre vide pendant
+ * le streaming ou sur un essai raté. Le texte du modèle explique déjà le cas.
+ * metric / button n'ont pas de tableau de données → toujours affichables.
+ */
+export function hasRenderableData(ui: UiDescriptor): boolean {
+  switch (ui.type) {
+    case "bar-chart":
+    case "line-chart":
+    case "pie-chart":
+    case "table":
+      return Array.isArray(ui.data) && ui.data.length > 0;
+    case "metric-grid":
+      return Array.isArray(ui.items) && ui.items.length > 0;
+    default:
+      return true;
+  }
+}
