@@ -79,9 +79,27 @@ Le LLM recherche les opérations disponibles, écrit du code dans le sandbox, ap
 ## Tests
 
 ```bash
-pnpm test          # 52 tests (vitest) — requiert Deno installé
+pnpm test          # 61 tests (vitest) — requiert Deno installé
 pnpm typecheck     # vérification TypeScript (tsc --noEmit)
 ```
+
+## Observabilité (Langfuse, optionnel)
+
+Le chat backend est instrumenté via **OpenTelemetry** (standard vendor-neutral) ;
+**Langfuse** n'est qu'un exporter branchable — remplaçable par n'importe quel
+backend OTel sans toucher au cœur.
+
+Activation : renseigner les clés dans `packages/chat-backend/.env` (laisser vide = désactivé).
+
+```bash
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_BASEURL=https://cloud.langfuse.com   # ou self-hosted
+```
+
+Chaque message produit une trace : appels LLM (tokens, coût, latence) et tool calls,
+avec **le code généré**, les logs sandbox, le `__ui` produit et les erreurs — utile
+pour diagnostiquer un chart manquant ou un code qui échoue.
 
 ## Architecture
 

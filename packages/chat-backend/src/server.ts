@@ -9,6 +9,7 @@ import { createMistral } from "@ai-sdk/mistral";
 import { createEngine, type Engine } from "mcp-server";
 import { loadConfigFromFile, type EngineConfig } from "catalogue";
 import { createChatHandler } from "./chat.js";
+import { initTelemetry, shutdownTelemetry } from "./telemetry.js";
 import type { LanguageModel, UIMessage } from "ai";
 
 /**
@@ -35,7 +36,8 @@ export function createChatApp(options: ChatServerOptions): Express {
 
   app.post("/chat", async (req, res) => {
     const messages = (req.body?.messages ?? []) as UIMessage[];
-    const response = await handleChat(messages);
+    const sessionId = typeof req.body?.id === "string" ? req.body.id : undefined;
+    const response = await handleChat(messages, { sessionId });
     await pipeWebResponse(response, res);
   });
 
@@ -77,6 +79,10 @@ async function pipeWebResponse(
 const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
   dotenv({ path: resolve(dirname(fileURLToPath(import.meta.url)), "../.env") });
+
+  // Démarre l'observabilité OTel→Langfuse AVANT toute requête instrumentée.
+  const telemetryOn = initTelemetry();
+
   const configPath = process.env.ENGINE_CONFIG ?? "./engine.config.json";
   let config: EngineConfig = {};
   try {
@@ -92,9 +98,21 @@ if (isMain) {
 
   createEngine(config).then((engine) => {
     const app = createChatApp({ engine, model: resolveModel(provider, modelId) });
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
       // eslint-disable-next-line no-console
-      console.log(`[chat-backend] listening on http://localhost:${port} (${provider}/${modelId})`);
+      console.log(
+        `[chat-backend] listening on http://localhost:${port} (${provider}/${modelId})` +
+          (telemetryOn ? " · Langfuse ON" : ""),
+      );
     });
+
+    // Arrêt propre : flush des traces avant de quitter.
+    const shutdown = () => {
+      server.close(() => {
+        void shutdownTelemetry().finally(() => process.exit(0));
+      });
+    };
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
   });
 }
