@@ -4,8 +4,12 @@
 set -euo pipefail
 
 if command -v deno >/dev/null 2>&1; then
-  echo "[setup-deno] deno déjà présent: $(deno --version | head -1)"
-  exit 0
+  # Vérifie que le binaire tourne vraiment (mauvaise archi = exec format error)
+  if deno --version >/dev/null 2>&1; then
+    echo "[setup-deno] deno déjà présent: $(deno --version | head -1)"
+    exit 0
+  fi
+  echo "[setup-deno] deno trouvé mais inutilisable (mauvaise architecture ?), réinstallation…"
 fi
 
 echo "[setup-deno] installation de Deno…"

@@ -143,10 +143,16 @@ export class DenoWorkerExecutor implements SandboxExecutor {
         stderrBuf += chunk.toString("utf-8");
       });
 
-      child.on("error", (err) => {
+      child.on("error", (err: NodeJS.ErrnoException) => {
+        const hint =
+          err.code === "ENOENT"
+            ? " — deno introuvable dans le PATH, relancer scripts/setup-deno.sh"
+            : err.code === "ENOEXEC" || err.errno === -8
+              ? " — binaire deno incompatible (mauvaise architecture), relancer scripts/setup-deno.sh"
+              : "";
         finish({
           ok: false,
-          error: { message: `Failed to spawn Deno sandbox: ${err.message}` },
+          error: { message: `Failed to spawn Deno sandbox: ${err.message}${hint}` },
         });
       });
 
