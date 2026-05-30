@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.0",
+    "@ai-sdk/mistral": "^3.0.37",
     "ai": "^6.0.0",
     "catalogue": "workspace:*",
     "cors": "^2.8.5",
