@@ -41,13 +41,21 @@ const engineConfigSchema = z.object({
       topK: z.number().int().positive().optional(),
     })
     .optional(),
-  mutations: z.object({ mode: z.enum(["intent", "direct"]).optional() }).optional(),
-  results: z.object({ maxBytes: z.number().int().positive().optional() }).optional(),
+  mutations: z
+    .object({ mode: z.enum(["intent", "direct"]).optional() })
+    .optional(),
+  results: z
+    .object({ maxBytes: z.number().int().positive().optional() })
+    .optional(),
 });
 
 export interface ResolvedConfig {
   providers: NonNullable<EngineConfig["providers"]>;
-  sandbox: { runtime: "deno" | "isolated-vm"; timeoutMs: number; memoryMb: number };
+  sandbox: {
+    runtime: "deno" | "isolated-vm";
+    timeoutMs: number;
+    memoryMb: number;
+  };
   search: { backend: "bm25" | "embeddings"; topK: number };
   mutations: { mode: "intent" | "direct" };
   results: { maxBytes: number };
@@ -56,7 +64,7 @@ export interface ResolvedConfig {
 }
 
 const DEFAULTS = {
-  sandbox: { runtime: "deno" as const, timeoutMs: 5000, memoryMb: 128 },
+  sandbox: { runtime: "deno" as const, timeoutMs: 30000, memoryMb: 128 },
   search: { backend: "bm25" as const, topK: 8 },
   mutations: { mode: "intent" as const },
   results: { maxBytes: 32_000 },
@@ -76,7 +84,9 @@ export function resolveConfig(config: EngineConfig = {}): ResolvedConfig {
       topK: config.search?.topK ?? DEFAULTS.search.topK,
     },
     mutations: { mode: config.mutations?.mode ?? DEFAULTS.mutations.mode },
-    results: { maxBytes: config.results?.maxBytes ?? DEFAULTS.results.maxBytes },
+    results: {
+      maxBytes: config.results?.maxBytes ?? DEFAULTS.results.maxBytes,
+    },
     embeddingsFn: config.search?.embeddingsFn,
   };
 }

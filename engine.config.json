@@ -4,6 +4,15 @@
       "name": "mock",
       "openapi": "packages/mock-api/openapi.yaml",
       "baseUrl": "http://localhost:3001"
+    },
+    {
+      "name": "grimp",
+      "openapi": "https://api-preprod.grimp.app/partner/education/doc-json",
+      "baseUrl": "https://api-preprod.grimp.app",
+      "auth": {
+        "type": "bearer",
+        "tokenEnv": "GRIMP_API_KEY"
+      }
     }
   ],
   "sandbox": { "runtime": "deno", "timeoutMs": 5000, "memoryMb": 128 },
