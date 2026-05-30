@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import ts from "typescript";
 import type { ExecOpts, HostBridge, RawExecResult, SandboxExecutor } from "catalogue";
 
 /**
@@ -34,6 +35,28 @@ interface ResultMsg {
 }
 type HostMsg = BridgeCallMsg | ResultMsg;
 
+/**
+ * Transpile TypeScript → JavaScript using TypeScript's own `transpileModule`.
+ * `ModuleKind.None` treats the code as a script (not a module), which allows
+ * top-level `return` statements — exactly what the sandbox function body needs.
+ * Runs in the trusted Node process before code enters the sandbox.
+ */
+function transpileTs(code: string): { code: string; error?: string } {
+  try {
+    const result = ts.transpileModule(code, {
+      compilerOptions: {
+        module: ts.ModuleKind.None,
+        target: ts.ScriptTarget.ES2022,
+        removeComments: false,
+      },
+    });
+    return { code: result.outputText };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { code, error: msg };
+  }
+}
+
 export interface DenoWorkerExecutorOptions {
   /** Chemin de l'exécutable Deno. Défaut: "deno" dans le PATH. */
   denoPath?: string;
@@ -46,7 +69,17 @@ export class DenoWorkerExecutor implements SandboxExecutor {
     this.denoPath = opts.denoPath ?? process.env.DENO_PATH ?? "deno";
   }
 
-  execute(code: string, bridge: HostBridge, opts: ExecOpts): Promise<RawExecResult> {
+  async execute(code: string, bridge: HostBridge, opts: ExecOpts): Promise<RawExecResult> {
+    // Transpile TypeScript → JavaScript before entering the sandbox.
+    // The worker-harness runs code via `new Function` (pure JS engine): TS syntax
+    // (type annotations, interfaces, `as` casts) causes "strict mode reserved word"
+    // parse errors. esbuild strips the TS layer in the trusted Node process.
+    const transpiled = transpileTs(code);
+    if (transpiled.error) {
+      return { ok: false, error: { message: `TypeScript transpilation error: ${transpiled.error}` } };
+    }
+    const jsCode = transpiled.code;
+
     return new Promise<RawExecResult>((resolve) => {
       // Enrichit le PATH avec les emplacements d'install courants de Deno
       // (~/.deno/bin, /usr/local/bin) au cas où ils seraient absents du PATH
@@ -167,8 +200,8 @@ export class DenoWorkerExecutor implements SandboxExecutor {
         });
       });
 
-      // Démarre l'exécution.
-      sendToDeno({ type: "exec", code, timeoutMs: opts.timeoutMs });
+      // Démarre l'exécution avec le code transpilé (JS pur, TS déjà strippé).
+      sendToDeno({ type: "exec", code: jsCode, timeoutMs: opts.timeoutMs });
     });
   }
 }

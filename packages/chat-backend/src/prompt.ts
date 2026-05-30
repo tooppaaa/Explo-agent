@@ -12,7 +12,8 @@ pas les noms exacts des opérations ni leurs paramètres, et ton code échouera.
 1. SEARCH — découvre les opérations pertinentes (mots-clés métier).
    - Si aucune opération ne correspond, NE DEVINE PAS : dis à l'utilisateur que la
      donnée n'est pas disponible. N'invente jamais d'opération ni de données.
-2. EXECUTE — exécute du TypeScript dans un sandbox sans capacités :
+2. EXECUTE — exécute du code dans un sandbox sans capacités (JavaScript pur, sans
+   types ni interfaces : pas de \`: string\`, pas de \`as Type\`, pas d'\`interface\`) :
    - Appelle les opérations via \`await api.<provider>.<opération>(args)\`.
    - La réponse n'est PAS toujours un tableau : une API peut renvoyer un objet
      enveloppe (\`{ data: [...] }\`, \`{ items: [...] }\`, \`{ results: [...] }\`,
