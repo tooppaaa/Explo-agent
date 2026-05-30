@@ -9,6 +9,7 @@ import {
 } from "../packages/widget/src/extract.js";
 import { initAgent } from "../packages/widget/src/index.js";
 import { ArtifactRenderer } from "../packages/widget/src/ArtifactRenderer.js";
+import { Markdown } from "../packages/widget/src/Markdown.js";
 import type { UiDescriptor } from "../packages/widget/src/ui-descriptor.js";
 
 describe("widget — extraction d'artifacts (purs)", () => {
@@ -168,6 +169,20 @@ describe("widget — rendu GenUI (ArtifactRenderer)", () => {
     renderUi({ type: "wtf" } as unknown as UiDescriptor);
     expect(container.querySelector(".cme-error")).toBeTruthy();
     expect(container.textContent).toContain("non supporté");
+  });
+
+  it("rend le markdown du texte (gras) en HTML sémantique", async () => {
+    (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(<Markdown>{"Voici un **résultat** important."}</Markdown>);
+    });
+    // Streamdown parse le markdown de façon asynchrone : on laisse passer un tick.
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(container.querySelector(".cme-md")).toBeTruthy();
+    expect(container.textContent).toContain("Voici un résultat important.");
+    // streamdown balise le gras via data-streamdown="strong" (span, pas <strong>).
+    expect(container.querySelector('[data-streamdown="strong"]')?.textContent).toBe("résultat");
   });
 });
 

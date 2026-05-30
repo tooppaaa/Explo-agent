@@ -1,6 +1,7 @@
 import type { UIMessage } from "ai";
 import { extractText, extractOrderedItems } from "./extract.js";
 import { ArtifactRenderer } from "./ArtifactRenderer.js";
+import { Markdown } from "./Markdown.js";
 
 interface Props {
   message: UIMessage;
@@ -31,7 +32,9 @@ export function MessageView({ message, onAction }: Props) {
           {items.map((item, i) => {
             if (item.kind === "text") {
               return item.text ? (
-                <div key={i} className="cme-text">{item.text}</div>
+                <div key={i} className="cme-text">
+                  <Markdown>{item.text}</Markdown>
+                </div>
               ) : null;
             }
             const out = item.output;

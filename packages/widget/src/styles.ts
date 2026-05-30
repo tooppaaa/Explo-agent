@@ -125,10 +125,52 @@ export const WIDGET_CSS = `
 .cme-msg-assistant .cme-text {
   background: #fff; color: #1f2937;
   padding: 10px 14px; border-radius: 4px 18px 18px 18px;
-  font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+  font-size: 14px; line-height: 1.6; word-break: break-word;
   box-shadow: 0 1px 4px rgba(0,0,0,.07);
   border: 1px solid #ebebf0;
 }
+
+/* ── Markdown (streamdown) ────────────────────────────────────────────────────
+   Streamdown applique des classes utilitaires Tailwind (no-op hors Tailwind) et
+   expose des hooks sémantiques data-streamdown="…" sur chaque élément. On
+   stylise via ces hooks (robuste, indépendant de Tailwind) + les tags réels,
+   pour rester cohérent avec le design system du widget. */
+.cme-md > div { display: flex; flex-direction: column; gap: 8px; }
+.cme-md p { margin: 0; }
+.cme-md [data-streamdown="strong"], .cme-md strong { font-weight: 650; color: #111827; }
+.cme-md em { font-style: italic; }
+/* streamdown rend les liens en <button> (modale de sécurité) : on lui rend
+   l'apparence d'un lien inline. */
+.cme-md [data-streamdown="link"], .cme-md a {
+  color: #4f46e5; text-decoration: underline; word-break: break-all;
+  background: none; border: none; padding: 0; font: inherit; cursor: pointer;
+}
+.cme-md [data-streamdown="unordered-list"], .cme-md [data-streamdown="ordered-list"],
+.cme-md ul, .cme-md ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 3px; }
+.cme-md li { margin: 0; }
+.cme-md h1, .cme-md h2, .cme-md h3,
+.cme-md [data-streamdown^="heading-"] { font-size: 14px; font-weight: 650; color: #111827; margin: 4px 0 0; }
+.cme-md [data-streamdown="inline-code"] {
+  font-family: ui-monospace, 'Cascadia Code', monospace; font-size: 12px;
+  background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; padding: 1px 5px;
+}
+.cme-md [data-streamdown="code-block"], .cme-md pre {
+  background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px;
+  overflow-x: auto; margin: 0;
+}
+.cme-md [data-streamdown="code-block-header"] {
+  font-size: 11px; color: #6b7280; padding: 4px 10px; border-bottom: 1px solid #eef0f3;
+}
+.cme-md pre { padding: 10px 12px; }
+.cme-md pre code { background: none; border: none; padding: 0; font-size: 12px; }
+.cme-md [data-streamdown="blockquote"], .cme-md blockquote {
+  border-left: 3px solid #e5e7eb; padding-left: 10px; color: #6b7280; margin: 0;
+}
+.cme-md [data-streamdown="table-wrapper"] { overflow-x: auto; border-radius: 8px; }
+.cme-md table { border-collapse: collapse; font-size: 12px; width: 100%; }
+.cme-md th { background: #f8f9fb; padding: 6px 9px; font-weight: 600; color: #374151; text-align: left; border: 1px solid #e5e7eb; }
+.cme-md td { padding: 6px 9px; color: #4b5563; border: 1px solid #f0f1f3; }
+.cme-md hr { border: none; border-top: 1px solid #e5e7eb; margin: 4px 0; }
 
 /* ── Typing indicator ─────────────────────────────────────────────────────── */
 .cme-typing { display: flex; align-items: flex-start; gap: 8px; }
