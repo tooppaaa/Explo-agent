@@ -7,12 +7,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const specPath = join(__dirname, "..", "packages", "mock-api", "openapi.yaml");
 
 describe("catalogue builder", () => {
-  it("parse la spec mock en Operation[] (lecture uniquement)", async () => {
+  it("parse la spec mock en Operation[] (GET + POST mutant)", async () => {
     const ops = await buildCatalogue(specPath, { providerName: "mock" });
-    // 5 endpoints de lecture (GET) dans la spec mock.
-    expect(ops.length).toBe(5);
-    expect(ops.every((o) => o.mutating === false)).toBe(true);
-    expect(ops.every((o) => o.http.method === "get")).toBe(true);
+    // 5 endpoints GET + 1 POST (createOrder) dans la spec mock.
+    expect(ops.length).toBe(6);
+    expect(ops.filter((o) => !o.mutating).every((o) => o.http.method === "get")).toBe(true);
+    expect(ops.some((o) => o.mutating && o.http.method === "post")).toBe(true);
   });
 
   it("namespace les opérations par provider", async () => {

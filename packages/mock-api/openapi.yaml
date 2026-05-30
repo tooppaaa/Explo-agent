@@ -58,6 +58,33 @@ paths:
                 items:
                   $ref: "#/components/schemas/Customer"
   /orders:
+    post:
+      operationId: createOrder
+      summary: Crée une nouvelle commande
+      description: Crée une commande (mutante — requiert confirmation).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customerId:
+                  type: string
+                region:
+                  type: string
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/OrderItem"
+              required: [customerId, region, items]
+      responses:
+        "201":
+          description: Commande créée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
     get:
       operationId: listOrders
       summary: Liste les commandes

@@ -78,6 +78,47 @@ describe("truncation (§10.8)", () => {
   });
 });
 
+describe("mutations (mode intent, §6)", () => {
+  it("bloque une op mutante et retourne pendingMutation", async () => {
+    const engine = await createEngine({
+      providers: [{ name: "mock", openapi: specPath, baseUrl }],
+    });
+    const code = `
+      const order = await api.mock.createOrder({ body: { customerId: "c1", region: "EMEA", items: [] } });
+      return order;
+    `;
+    const res = await engine.execute(code);
+    expect(res.ok).toBe(false);
+    expect(res.pendingMutation).toBeTruthy();
+    expect(res.pendingMutation?.opName).toBe("mock.createOrder");
+    expect(res.pendingMutation?.id).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("confirmMutation exécute la mutation et retourne le résultat", async () => {
+    const engine = await createEngine({
+      providers: [{ name: "mock", openapi: specPath, baseUrl }],
+    });
+    const code = `
+      const order = await api.mock.createOrder({ body: { customerId: "c1", region: "EMEA", items: [] } });
+      return order;
+    `;
+    const blocked = await engine.execute(code);
+    expect(blocked.pendingMutation).toBeTruthy();
+
+    const confirmed = await engine.confirmMutation(blocked.pendingMutation!.id);
+    expect(confirmed.ok).toBe(true);
+    expect((confirmed.result as { id: string }).id).toBeTruthy();
+    expect((confirmed.result as { status: string }).status).toBe("processing");
+  });
+
+  it("confirmMutation retourne une erreur si l'id est inconnu", async () => {
+    const engine = await createEngine({});
+    const res = await engine.confirmMutation("nope");
+    expect(res.ok).toBe(false);
+    expect(res.error?.message).toContain("nope");
+  });
+});
+
 describe("inferUiDescriptor", () => {
   it("tableau d'objets numériques → bar-chart", () => {
     expect(inferUiDescriptor([{ region: "EMEA", revenue: 100 }])?.type).toBe("bar-chart");

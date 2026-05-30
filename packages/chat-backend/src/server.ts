@@ -34,6 +34,20 @@ export function createChatApp(options: ChatServerOptions): Express {
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
+  app.post("/confirm", async (req, res) => {
+    const id = typeof req.body?.id === "string" ? req.body.id : undefined;
+    if (!id) {
+      res.status(400).json({ ok: false, error: { message: "id requis" } });
+      return;
+    }
+    try {
+      const result = await options.engine.confirmMutation(id);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ ok: false, error: { message: err instanceof Error ? err.message : String(err) } });
+    }
+  });
+
   app.post("/chat", async (req, res) => {
     const messages = (req.body?.messages ?? []) as UIMessage[];
     const sessionId = typeof req.body?.id === "string" ? req.body.id : undefined;

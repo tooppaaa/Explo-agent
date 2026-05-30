@@ -45,6 +45,7 @@ const orders = loadFixture<Order[]>("orders.json");
 
 export function createApp(): Express {
   const app = express();
+  app.use(express.json());
 
   // Petit log non sensible (pas de credentials : l'API mock est publique).
   app.use((req, _res, next) => {
@@ -72,6 +73,21 @@ export function createApp(): Express {
       result = result.filter((c) => c.tier === tier);
     }
     res.json(result);
+  });
+
+  app.post("/orders", (req: Request, res: Response) => {
+    const body = req.body as { customerId?: string; region?: string; items?: OrderItem[] };
+    const newOrder: Order = {
+      id: "o" + (orders.length + 1),
+      customerId: body.customerId ?? "unknown",
+      region: body.region ?? "EMEA",
+      status: "processing",
+      total: 0,
+      date: new Date().toISOString().slice(0, 10),
+      items: body.items ?? [],
+    };
+    orders.push(newOrder);
+    res.status(201).json(newOrder);
   });
 
   app.get("/orders", (req: Request, res: Response) => {

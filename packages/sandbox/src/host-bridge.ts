@@ -55,15 +55,20 @@ interface ProviderRuntime {
 export interface HostBridgeOptions {
   /** fetch injectable (tests). Défaut: global fetch. */
   fetchImpl?: typeof fetch;
+  /** Permet l'exécution d'opérations mutantes (POST/PUT/PATCH/DELETE).
+   *  false par défaut : les mutations sont bloquées jusqu'à confirmation (mode intent). */
+  allowMutations?: boolean;
 }
 
 export class HttpHostBridge implements HostBridge {
   private readonly ops = new Map<string, Operation>();
   private readonly providers = new Map<string, ProviderRuntime>();
   private readonly fetchImpl: typeof fetch;
+  private readonly allowMutations: boolean;
 
   constructor(operations: Operation[], providerConfigs: ApiProvider[], opts: HostBridgeOptions = {}) {
     this.fetchImpl = opts.fetchImpl ?? fetch;
+    this.allowMutations = opts.allowMutations ?? false;
     for (const op of operations) this.ops.set(op.name, op);
     for (const p of providerConfigs) {
       this.providers.set(p.name, {
@@ -77,9 +82,10 @@ export class HttpHostBridge implements HostBridge {
     const op = this.ops.get(name);
     if (!op) throw new Error(`Unknown operation: ${name}`);
 
-    // M0 : lecture seule. Garde défensive (les mutations arriveront en M4).
-    if (op.mutating) {
-      throw new Error(`Operation "${name}" is mutating; mutations are not enabled (M0 read-only).`);
+    // Mode intent (PRD §6) : toute op mutante est bloquée sans confirmation.
+    // L'engine détecte le préfixe MUTATION_BLOCKED pour créer un pendingMutation.
+    if (op.mutating && !this.allowMutations) {
+      throw new Error("MUTATION_BLOCKED:" + JSON.stringify({ name, args: rawArgs }));
     }
 
     const provider = this.providers.get(op.provider);

@@ -7,13 +7,12 @@ import type { HttpMethod, Operation, ParamLocation } from "./types.js";
  * Catalogue builder (PRD §6.2).
  * Parse + déréférence une spec OpenAPI 3.0/3.1, produit des Operation[].
  *
- * M0 (brief) : OPÉRATIONS DE LECTURE UNIQUEMENT. On n'émet que les GET.
- * Le champ `mutating` reste sur le type pour rester compatible avec M4,
- * mais aucune op mutante n'est exposée en M0.
+ * Toutes les méthodes (GET, POST, PUT, PATCH, DELETE) sont indexées.
+ * Les opérations mutantes (POST/PUT/PATCH/DELETE) ont `mutating: true` ;
+ * elles sont bloquées par le HostBridge jusqu'à confirmation explicite (mode intent).
  */
 
 const MUTATING_METHODS = new Set(["post", "put", "patch", "delete"]);
-const READ_METHODS = new Set<HttpMethod>(["get"]);
 
 interface OpenAPIParameter {
   name: string;
@@ -159,13 +158,10 @@ export async function buildCatalogue(
   for (const [pathTemplate, pathItem] of Object.entries(paths)) {
     for (const [methodRaw, opObj] of Object.entries(pathItem)) {
       const method = methodRaw.toLowerCase() as HttpMethod;
-      if (!READ_METHODS.has(method)) continue; // M0 : lecture uniquement
+      if (!["get", "post", "put", "patch", "delete"].includes(method)) continue;
 
       const op = opObj;
       const mutating = op["x-mutating"] ?? MUTATING_METHODS.has(method);
-      // En M0 on ne devrait jamais avoir mutating=true ici (filtré au-dessus),
-      // mais on respecte un éventuel override x-mutating.
-      if (mutating) continue;
 
       const operationId = op.operationId ?? slugify(method, pathTemplate);
       const fullName = `${opts.providerName}.${operationId}`;
@@ -179,7 +175,7 @@ export async function buildCatalogue(
         signature,
         responseType,
         schema,
-        mutating: false,
+        mutating,
         provider: opts.providerName,
         http: { method, pathTemplate, params, hasBody },
       });

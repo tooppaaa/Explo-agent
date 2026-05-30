@@ -25,6 +25,8 @@ export interface ExecuteResult {
   ui?: UiDescriptor;
   truncated?: boolean;
   error?: { message: string; stack?: string };
+  /** Présent quand une op mutante a été bloquée (mode intent). */
+  pendingMutation?: { id: string; opName: string; args: unknown };
 }
 
 export interface Engine {
@@ -33,6 +35,8 @@ export interface Engine {
   dts: string;
   search(query: string, k?: number): SearchResult;
   execute(code: string): Promise<ExecuteResult>;
+  /** Exécute la mutation stockée en attente (après confirmation utilisateur). */
+  confirmMutation(id: string): Promise<ExecuteResult>;
 }
 
 export interface CreateEngineOptions {
@@ -58,6 +62,7 @@ export async function createEngine(
     fetchImpl: opts.fetchImpl,
   });
   const dts = generateDts(operations);
+  const pendingMutations = new Map<string, { code: string }>();
 
   return {
     config: resolved,
@@ -76,6 +81,25 @@ export async function createEngine(
       });
 
       if (!raw.ok) {
+        // Mode intent : op mutante bloquée → stocker comme intent en attente.
+        if (raw.error?.message?.startsWith("MUTATION_BLOCKED:")) {
+          try {
+            const blocked = JSON.parse(raw.error.message.slice("MUTATION_BLOCKED:".length)) as {
+              name: string;
+              args: unknown;
+            };
+            const id = crypto.randomUUID();
+            pendingMutations.set(id, { code });
+            return {
+              ok: false,
+              logs: raw.logs,
+              error: { message: `L'opération "${blocked.name}" est mutante et requiert une confirmation.` },
+              pendingMutation: { id, opName: blocked.name, args: blocked.args },
+            };
+          } catch {
+            // JSON.parse failed – fall through to generic error
+          }
+        }
         return { ok: false, logs: raw.logs, error: raw.error };
       }
 
@@ -93,6 +117,52 @@ export async function createEngine(
           // AVANT validation, sinon tout chart échoue et retombe sur l'inférence
           // (un pie-chart demandé devenait un bar-chart). On valide ainsi le
           // descripteur complet, data incluse — c'est ce que le widget rend.
+          const meta = obj.__ui;
+          const candidate =
+            meta && typeof meta === "object" && !Array.isArray(meta) && !("data" in meta) && data !== undefined
+              ? { ...(meta as Record<string, unknown>), data }
+              : meta;
+          ui = parseUiDescriptor(candidate);
+        }
+      }
+
+      const { value, truncated } = truncateResult(data, resolved.results.maxBytes);
+      return {
+        ok: true,
+        result: value,
+        logs: raw.logs,
+        ui: ui ?? inferUiDescriptor(value),
+        truncated,
+      };
+    },
+
+    async confirmMutation(id: string): Promise<ExecuteResult> {
+      const pending = pendingMutations.get(id);
+      if (!pending) {
+        return { ok: false, error: { message: `Aucune mutation en attente avec l'identifiant "${id}".` } };
+      }
+      pendingMutations.delete(id);
+
+      const confirmBridge = new HttpHostBridge(operations, resolved.providers, {
+        fetchImpl: opts.fetchImpl,
+        allowMutations: true,
+      });
+
+      const raw = await executor.execute(pending.code, confirmBridge, {
+        timeoutMs: resolved.sandbox.timeoutMs,
+        memoryMb: resolved.sandbox.memoryMb,
+      });
+
+      if (!raw.ok) {
+        return { ok: false, logs: raw.logs, error: raw.error };
+      }
+
+      let data: unknown = raw.result;
+      let ui: UiDescriptor | undefined;
+      if (raw.result && typeof raw.result === "object" && !Array.isArray(raw.result)) {
+        const obj = raw.result as Record<string, unknown>;
+        if ("__ui" in obj) {
+          data = "data" in obj ? obj.data : undefined;
           const meta = obj.__ui;
           const candidate =
             meta && typeof meta === "object" && !Array.isArray(meta) && !("data" in meta) && data !== undefined

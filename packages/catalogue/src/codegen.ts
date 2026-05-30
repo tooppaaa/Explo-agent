@@ -26,7 +26,11 @@ export function generateDts(operations: Operation[]): string {
       // op.name = "provider.operationId" → on ne garde que la méthode.
       const method = op.name.slice(provider.length + 1);
       const argsType = extractArgsType(op.signature);
-      if (op.description) lines.push(`  /** ${op.description.replace(/\n/g, " ")} */`);
+      const desc = [
+        op.description ? op.description.replace(/\n/g, " ") : "",
+        op.mutating ? "@mutating — confirmation requise avant exécution." : "",
+      ].filter(Boolean).join(" ");
+      if (desc) lines.push(`  /** ${desc} */`);
       lines.push(`  ${method}(args: ${argsType}): Promise<${op.responseType}>;`);
     }
     lines.push("}");

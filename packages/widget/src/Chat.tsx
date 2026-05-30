@@ -31,7 +31,7 @@ function getToolStatus(messages: UIMessage[], busy: boolean): string | null {
 }
 
 export function Chat({ backendUrl, primary }: ChatProps) {
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, setMessages } = useChat({
     transport: new DefaultChatTransport({ api: backendUrl }),
   });
   const [input, setInput] = useState("");
@@ -59,9 +59,49 @@ export function Chat({ backendUrl, primary }: ChatProps) {
     void sendMessage({ text });
   }, [input, busy, sendMessage]);
 
+  const handleConfirm = useCallback(async (id: string) => {
+    const confirmUrl = backendUrl.replace(/\/chat$/, "/confirm");
+    try {
+      const res = await fetch(confirmUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const result = await res.json() as { ok: boolean; error?: { message?: string }; [key: string]: unknown };
+      const statusText = result.ok ? "Opération effectuée." : (result.error?.message ?? "Erreur lors de la confirmation.");
+      // Inject a synthetic assistant message rendering the confirmed result.
+      const syntheticMsg: UIMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        parts: [
+          { type: "text", text: statusText, state: "done" } as UIMessage["parts"][number],
+          ...(result.ok
+            ? [{
+                type: "dynamic-tool",
+                toolName: "execute",
+                toolCallId: crypto.randomUUID(),
+                state: "output-available",
+                input: {},
+                output: result,
+              } as UIMessage["parts"][number]]
+            : []),
+        ],
+      };
+      setMessages([...messages, syntheticMsg]);
+    } catch {
+      /* confirm failed silently */
+    }
+  }, [backendUrl, messages, setMessages]);
+
   const onAction = useCallback(
-    (msg: string) => { void sendMessage({ text: msg }); },
-    [sendMessage],
+    (msg: string) => {
+      if (msg.startsWith("__confirm:")) {
+        void handleConfirm(msg.slice("__confirm:".length));
+      } else {
+        void sendMessage({ text: msg });
+      }
+    },
+    [sendMessage, handleConfirm],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

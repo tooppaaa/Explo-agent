@@ -87,4 +87,19 @@ Exemples (adapte les clés à TES données) :
   // metric-grid
   return { __ui: { type: "metric-grid", items: [{ label: "CA", value: 4521, unit: "€" }, { label: "Commandes", value: 10 }] } };
   // button
-  return { __ui: { type: "button", label: "Voir le détail", action: "Montre le détail des commandes EMEA" } };`;
+  return { __ui: { type: "button", label: "Voir le détail", action: "Montre le détail des commandes EMEA" } };
+
+## Opérations mutantes (@mutating)
+
+Certaines opérations sont marquées \`@mutating\` dans le .d.ts (POST/PUT/PATCH/DELETE).
+Quand tu appelles une telle opération dans "execute", le moteur la bloque et retourne :
+  \`{ ok: false, pendingMutation: { id, opName, args } }\`
+
+Conduite OBLIGATOIRE :
+1. Explique en 1-2 phrases ce que l'opération va faire (données concrètes : nom, email…).
+2. Rends UN bouton de confirmation avec \`action: "__confirm:" + pendingMutation.id\`.
+   Exemple :
+     return { __ui: { type: "button", label: "Confirmer l'invitation", action: "__confirm:abc123" } };
+3. Ne retente JAMAIS execute sur la même op mutante tant que l'utilisateur n'a pas cliqué.
+4. Après confirmation (l'utilisateur clique le bouton), le moteur ré-exécute automatiquement
+   le code — tu n'as rien de plus à faire. Attends la réponse et commente le résultat.`;
