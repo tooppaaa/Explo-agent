@@ -58,8 +58,12 @@ export async function createEngine(
 
   const searchBackend: SearchBackend = createSearch(operations, resolved.search.topK);
   const executor = opts.executor ?? new DenoWorkerExecutor();
+  // Mode "direct" (config) : les mutations s'exécutent sans confirmation.
+  // Mode "intent" (défaut) : elles sont bloquées → bouton de confirmation.
+  const allowMutations = resolved.mutations.mode === "direct";
   const bridge = new HttpHostBridge(operations, resolved.providers, {
     fetchImpl: opts.fetchImpl,
+    allowMutations,
   });
   const dts = generateDts(operations);
   const pendingMutations = new Map<string, { code: string }>();
@@ -81,7 +85,10 @@ export async function createEngine(
       });
 
       if (!raw.ok) {
-        // Mode intent : op mutante bloquée → stocker comme intent en attente.
+        // Mode intent : op mutante bloquée → on stocke l'intent et on ÉMET
+        // NOUS-MÊMES le bouton de confirmation (pas l'erreur, pas le modèle).
+        // Le modèle n'a donc jamais à écrire de code pour rendre un bouton
+        // (source d'erreurs "label is not defined") ni à rappeler execute.
         if (raw.error?.message?.startsWith("MUTATION_BLOCKED:")) {
           try {
             const blocked = JSON.parse(raw.error.message.slice("MUTATION_BLOCKED:".length)) as {
@@ -93,8 +100,9 @@ export async function createEngine(
             return {
               ok: false,
               logs: raw.logs,
-              error: { message: `L'opération "${blocked.name}" est mutante et requiert une confirmation.` },
               pendingMutation: { id, opName: blocked.name, args: blocked.args },
+              // Bouton rendu directement par le widget (action interceptée → POST /confirm).
+              ui: { type: "button", label: "Confirmer et exécuter", action: `__confirm:${id}` },
             };
           } catch {
             // JSON.parse failed – fall through to generic error

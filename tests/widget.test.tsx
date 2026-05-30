@@ -104,6 +104,26 @@ describe("widget — extraction d'artifacts (purs)", () => {
     expect(outs[0].ok).toBe(false);
     expect(outs[0].error?.message).toBe("timeout");
   });
+
+  it("extractExecuteOutputs porte pendingMutation + bouton de confirmation", () => {
+    const msg = {
+      role: "assistant",
+      parts: [{
+        type: "tool-execute",
+        state: "output-available",
+        output: {
+          ok: false,
+          pendingMutation: { id: "abc-123", opName: "grimp.invite", args: {} },
+          ui: { type: "button", label: "Confirmer et exécuter", action: "__confirm:abc-123" },
+        },
+      }],
+    };
+    const outs = extractExecuteOutputs(msg);
+    expect(outs[0].pendingMutation?.id).toBe("abc-123");
+    expect(outs[0].ui?.type).toBe("button");
+    // Pas de message d'erreur "mutante" exposé à l'utilisateur.
+    expect(outs[0].error).toBeUndefined();
+  });
 });
 
 describe("widget — rendu GenUI (ArtifactRenderer)", () => {

@@ -86,7 +86,7 @@ describe("config loader", () => {
     const cfg = resolveConfig({});
     expect(cfg.providers).toEqual([]);
     expect(cfg.sandbox.runtime).toBe("deno");
-    expect(cfg.sandbox.timeoutMs).toBe(5000);
+    expect(cfg.sandbox.timeoutMs).toBe(30000);
     expect(cfg.search.backend).toBe("bm25");
     expect(cfg.search.topK).toBe(8);
     expect(cfg.mutations.mode).toBe("intent");

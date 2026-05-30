@@ -92,14 +92,18 @@ Exemples (adapte les clés à TES données) :
 ## Opérations mutantes (@mutating)
 
 Certaines opérations sont marquées \`@mutating\` dans le .d.ts (POST/PUT/PATCH/DELETE).
-Quand tu appelles une telle opération dans "execute", le moteur la bloque et retourne :
-  \`{ ok: false, pendingMutation: { id, opName, args } }\`
+Quand tu appelles une telle opération dans "execute", le moteur la BLOQUE avant tout
+appel réseau et retourne \`{ ok: false, pendingMutation: { id, opName, args } }\`.
 
-Conduite OBLIGATOIRE :
-1. Explique en 1-2 phrases ce que l'opération va faire (données concrètes : nom, email…).
-2. Rends UN bouton de confirmation avec \`action: "__confirm:" + pendingMutation.id\`.
-   Exemple :
-     return { __ui: { type: "button", label: "Confirmer l'invitation", action: "__confirm:abc123" } };
-3. Ne retente JAMAIS execute sur la même op mutante tant que l'utilisateur n'a pas cliqué.
-4. Après confirmation (l'utilisateur clique le bouton), le moteur ré-exécute automatiquement
-   le code — tu n'as rien de plus à faire. Attends la réponse et commente le résultat.`;
+IMPORTANT — le moteur affiche AUTOMATIQUEMENT le bouton « Confirmer et exécuter ».
+Tu n'as donc RIEN à rendre toi-même :
+1. NE rends JAMAIS de bouton \`__ui\` toi-même, n'écris JAMAIS \`__confirm:\` : c'est déjà fait.
+2. NE rappelle PAS "execute" pour la même opération : tu déclencherais un doublon.
+3. Écris simplement 1 à 2 phrases décrivant ce qui sera fait, avec les données concrètes
+   (nom, email…), puis ARRÊTE-TOI. Le bouton suit ton texte.
+4. Quand l'utilisateur clique, le moteur ré-exécute le code et affiche le résultat ;
+   tu n'as rien à faire de plus.
+
+Exemple de réponse correcte (un seul appel execute à l'op mutante, puis ce texte) :
+  « Je vais inviter Claude IsGood (claude.isgood@example.com) sur Grimp. »
+  → le bouton de confirmation s'affiche automatiquement sous ce texte.`;

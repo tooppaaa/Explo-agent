@@ -92,6 +92,10 @@ describe("mutations (mode intent, §6)", () => {
     expect(res.pendingMutation).toBeTruthy();
     expect(res.pendingMutation?.opName).toBe("mock.createOrder");
     expect(res.pendingMutation?.id).toMatch(/^[0-9a-f-]{36}$/);
+    // Pas de message d'erreur affiché à l'utilisateur ; le moteur émet le bouton.
+    expect(res.error).toBeUndefined();
+    expect(res.ui?.type).toBe("button");
+    expect((res.ui as { action: string }).action).toBe(`__confirm:${res.pendingMutation!.id}`);
   });
 
   it("confirmMutation exécute la mutation et retourne le résultat", async () => {

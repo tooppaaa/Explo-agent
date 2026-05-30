@@ -28,6 +28,8 @@ export interface ExecuteOutput {
   ui?: UiDescriptor;
   error?: { message?: string };
   logs?: string[];
+  /** Présent quand une op mutante attend confirmation (mode intent). */
+  pendingMutation?: { id: string; opName: string; args: unknown };
 }
 
 export function extractExecuteOutputs(message: UIMessage): ExecuteOutput[] {

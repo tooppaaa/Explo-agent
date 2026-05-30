@@ -38,6 +38,15 @@ export function MessageView({ message, onAction }: Props) {
               ) : null;
             }
             const out = item.output;
+            // Mutation en attente : on rend le bouton de confirmation émis par
+            // le moteur, jamais une erreur (le texte du modèle donne le contexte).
+            if (out.pendingMutation && out.ui) {
+              return (
+                <div key={i} className="cme-artifact-card">
+                  <ArtifactRenderer ui={out.ui} onAction={onAction} />
+                </div>
+              );
+            }
             if (!out.ok) {
               return (
                 <div key={i} className="cme-error" role="alert">
