@@ -87,8 +87,18 @@ export async function createEngine(
       if (raw.result && typeof raw.result === "object" && !Array.isArray(raw.result)) {
         const obj = raw.result as Record<string, unknown>;
         if ("__ui" in obj) {
-          ui = parseUiDescriptor(obj.__ui);
           data = "data" in obj ? obj.data : undefined;
+          // Le modèle renvoie le descripteur SANS `data` (passé séparément, cf.
+          // prompt). Les schémas chart/table EXIGENT `data` : il faut fusionner
+          // AVANT validation, sinon tout chart échoue et retombe sur l'inférence
+          // (un pie-chart demandé devenait un bar-chart). On valide ainsi le
+          // descripteur complet, data incluse — c'est ce que le widget rend.
+          const meta = obj.__ui;
+          const candidate =
+            meta && typeof meta === "object" && !Array.isArray(meta) && !("data" in meta) && data !== undefined
+              ? { ...(meta as Record<string, unknown>), data }
+              : meta;
+          ui = parseUiDescriptor(candidate);
         }
       }
 

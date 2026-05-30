@@ -125,4 +125,28 @@ describe("extraction __ui (sortie LLM non fiable)", () => {
     expect(res.ui).toBeUndefined();
     expect(res.result).toBe(42);
   });
+
+  it("fusionne data dans le descripteur : un pie-chart reste un pie-chart", async () => {
+    // Régression : data est passée séparément de __ui. Sans fusion avant
+    // validation, le pie-chart (data requis) échouait et retombait sur
+    // l'inférence → bar-chart. La fusion doit préserver le type demandé.
+    const engine = await stubEngine({
+      __ui: { type: "pie-chart", nameKey: "type", valueKey: "average", title: "Répartition" },
+      data: [{ type: "Autre", average: 16.2 }, { type: "BTS", average: 30 }],
+    });
+    const res = await engine.execute("…");
+    expect(res.ui?.type).toBe("pie-chart");
+    // La data fusionnée est présente DANS le descripteur (ce que rend le widget).
+    expect((res.ui as { data: unknown[] }).data).toHaveLength(2);
+  });
+
+  it("fusionne data dans un bar-chart complet (xKey/valueKeys)", async () => {
+    const engine = await stubEngine({
+      __ui: { type: "bar-chart", xKey: "region", valueKeys: ["revenue"] },
+      data: [{ region: "EMEA", revenue: 100 }],
+    });
+    const res = await engine.execute("…");
+    expect(res.ui?.type).toBe("bar-chart");
+    expect((res.ui as { data: unknown[] }).data).toEqual([{ region: "EMEA", revenue: 100 }]);
+  });
 });
