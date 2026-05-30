@@ -1,3 +1,6 @@
+import { config as dotenv } from "dotenv";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
 import express, { type Express } from "express";
 import cors from "cors";
@@ -55,6 +58,7 @@ async function pipeWebResponse(
 // ── Démarrage direct ─────────────────────────────────────────────────────────
 const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
+  dotenv({ path: resolve(dirname(fileURLToPath(import.meta.url)), "../.env") });
   const configPath = process.env.ENGINE_CONFIG ?? "./engine.config.json";
   let config: EngineConfig = {};
   try {

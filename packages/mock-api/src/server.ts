@@ -1,7 +1,8 @@
+import { config as dotenv } from "dotenv";
 import express, { type Express, type Request, type Response } from "express";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, "..", "fixtures");
@@ -123,6 +124,7 @@ export function createApp(): Express {
 // Démarrage direct (pas en import de test).
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
+  dotenv({ path: resolve(dirname(fileURLToPath(import.meta.url)), "../.env") });
   const port = Number(process.env.MOCK_API_PORT ?? 3001);
   createApp().listen(port, () => {
     // eslint-disable-next-line no-console

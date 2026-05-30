@@ -19,6 +19,17 @@ pnpm install
 bash scripts/setup-deno.sh   # installe Deno si absent
 ```
 
+Copier et remplir les variables d'environnement (chaque package a son `.env.example`) :
+
+```bash
+cp packages/chat-backend/.env.example packages/chat-backend/.env
+# Éditer packages/chat-backend/.env : renseigner ANTHROPIC_API_KEY
+
+# Les autres packages n'ont que des variables optionnelles :
+# cp packages/mock-api/.env.example packages/mock-api/.env
+# cp packages/mcp-server/.env.example packages/mcp-server/.env
+```
+
 ## Lancer la démo
 
 La démo nécessite **3 terminaux** lancés depuis la racine du projet.

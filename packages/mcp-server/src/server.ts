@@ -1,3 +1,6 @@
+import { config as dotenv } from "dotenv";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import express, { type Express } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createEngine } from "./engine.js";
@@ -41,6 +44,7 @@ export async function createMcpHttpApp(config: EngineConfig): Promise<Express> {
 const isMain =
   process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
+  dotenv({ path: resolve(dirname(fileURLToPath(import.meta.url)), "../.env") });
   const configPath = process.env.ENGINE_CONFIG ?? "./engine.config.json";
   const config = loadConfigFromFileSafe(configPath);
   const port = Number(process.env.MCP_PORT ?? 3000);
