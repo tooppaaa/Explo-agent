@@ -1,7 +1,9 @@
-// Même type que packages/catalogue/src/ui-descriptor.ts — dupliqué pour
-// éviter d'importer catalogue dans le bundle widget (zéro code runtime ici).
+// Types DUPLIQUÉS depuis packages/catalogue/src/ui-descriptor.ts.
+// Le widget n'embarque PAS catalogue (ni zod) dans son bundle IIFE — il ne lui
+// faut que les types (effacés au build). Garder en phase avec le schéma Zod
+// côté catalogue, qui reste la source de vérité pour la validation.
 
-export type BarChartDescriptor = {
+export type CartesianChartDescriptor = {
   type: "bar-chart" | "line-chart";
   data: Record<string, unknown>[];
   xKey: string;
@@ -44,7 +46,7 @@ export type ButtonDescriptor = {
 };
 
 export type UiDescriptor =
-  | BarChartDescriptor
+  | CartesianChartDescriptor
   | PieChartDescriptor
   | TableDescriptor
   | MetricDescriptor

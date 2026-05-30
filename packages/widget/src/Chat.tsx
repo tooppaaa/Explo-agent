@@ -40,13 +40,14 @@ export function Chat({ backendUrl, primary }: ChatProps) {
   const busy = status === "submitted" || status === "streaming";
   const toolStatus = getToolStatus(messages, busy);
 
-  // Auto-scroll to bottom on new messages / streaming
+  // Auto-scroll au bottom quand un message est ajouté ou que l'état busy change
+  // (et NON à chaque token de streaming, pour ne pas combattre le scroll user).
   useEffect(() => {
     const el = bottomRef.current;
     if (el && typeof el.scrollIntoView === "function") {
       el.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, busy]);
+  }, [messages.length, busy]);
 
   const handleSubmit = useCallback(() => {
     const text = input.trim();
@@ -107,7 +108,7 @@ export function Chat({ backendUrl, primary }: ChatProps) {
 
         {/* Typing / tool status indicator */}
         {busy && (
-          <div className="cme-typing">
+          <div className="cme-typing" role="status" aria-live="polite">
             <div className="cme-avatar">🤖</div>
             <div className="cme-assistant-content">
               {toolStatus ? (
@@ -116,7 +117,7 @@ export function Chat({ backendUrl, primary }: ChatProps) {
                   {toolStatus}
                 </div>
               ) : (
-                <div className="cme-typing-bubble">
+                <div className="cme-typing-bubble" aria-label="Le modèle réfléchit">
                   <div className="cme-dot" />
                   <div className="cme-dot" />
                   <div className="cme-dot" />

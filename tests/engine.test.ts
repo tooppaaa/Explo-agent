@@ -89,3 +89,40 @@ describe("inferUiDescriptor", () => {
     expect(inferUiDescriptor(42)).toBeUndefined();
   });
 });
+
+describe("extraction __ui (sortie LLM non fiable)", () => {
+  // Executor stub : renvoie un raw.result fixe sans lancer Deno.
+  const stubEngine = (rawResult: unknown) =>
+    createEngine(
+      {},
+      { executor: { execute: async () => ({ ok: true, result: rawResult, logs: [] }) } },
+    );
+
+  it("extrait un __ui valide et isole data comme result", async () => {
+    const engine = await stubEngine({
+      __ui: { type: "metric", label: "CA", value: 4521, unit: "€" },
+      data: { total: 4521 },
+    });
+    const res = await engine.execute("…");
+    expect(res.ui?.type).toBe("metric");
+    expect(res.result).toEqual({ total: 4521 });
+  });
+
+  it("rejette un __ui malformé et retombe sur l'inférence", async () => {
+    const engine = await stubEngine({
+      __ui: { type: "bar-chart" }, // valueKeys/xKey/data manquants → invalide
+      data: [{ region: "EMEA", revenue: 100 }],
+    });
+    const res = await engine.execute("…");
+    // L'inférence sur data (tableau numérique) redonne un bar-chart valide.
+    expect(res.ui?.type).toBe("bar-chart");
+    expect((res.ui as { valueKeys: string[] }).valueKeys).toEqual(["revenue"]);
+  });
+
+  it("ignore un type __ui inconnu", async () => {
+    const engine = await stubEngine({ __ui: { type: "hologram" }, data: 42 });
+    const res = await engine.execute("…");
+    expect(res.ui).toBeUndefined();
+    expect(res.result).toBe(42);
+  });
+});

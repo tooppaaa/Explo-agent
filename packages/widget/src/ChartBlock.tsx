@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
-import type { BarChartDescriptor, PieChartDescriptor, TableDescriptor } from "./ui-descriptor.js";
+import type { CartesianChartDescriptor, PieChartDescriptor, TableDescriptor } from "./ui-descriptor.js";
 
 const COLORS = ["#4f46e5", "#06b6d4", "#f59e0b", "#ef4444", "#10b981"];
 const RADIAN = Math.PI / 180;
@@ -13,7 +13,7 @@ function ChartTitle({ title }: { title?: string }) {
   return title ? <div className="cme-chart-title">{title}</div> : null;
 }
 
-export function BarChartBlock({ desc }: { desc: BarChartDescriptor & { type: "bar-chart" } }) {
+export function BarChartBlock({ desc }: { desc: CartesianChartDescriptor }) {
   const { data, xKey, valueKeys, title } = desc;
   return (
     <div className="cme-chart">
@@ -33,7 +33,7 @@ export function BarChartBlock({ desc }: { desc: BarChartDescriptor & { type: "ba
   );
 }
 
-export function LineChartBlock({ desc }: { desc: BarChartDescriptor & { type: "line-chart" } }) {
+export function LineChartBlock({ desc }: { desc: CartesianChartDescriptor }) {
   const { data, xKey, valueKeys, title } = desc;
   return (
     <div className="cme-chart">

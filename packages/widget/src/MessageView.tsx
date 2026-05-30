@@ -8,8 +8,8 @@ interface Props {
 }
 
 export function MessageView({ message, onAction }: Props) {
-  const text = extractText(message as never);
-  const outputs = extractExecuteOutputs(message as never);
+  const text = extractText(message);
+  const outputs = extractExecuteOutputs(message);
   const isUser = message.role === "user";
 
   if (isUser) {
@@ -29,7 +29,7 @@ export function MessageView({ message, onAction }: Props) {
           {outputs.map((out, i) => {
             if (!out.ok) {
               return (
-                <div key={i} className="cme-error">
+                <div key={i} className="cme-error" role="alert">
                   ⚠ {out.error?.message ?? "Erreur inconnue"}
                 </div>
               );

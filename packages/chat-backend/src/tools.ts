@@ -39,7 +39,7 @@ export function buildAiTools(engine: Engine): ToolSet {
         dbg("llm→execute", "\n" + code.split("\n").map((l) => "  " + l).join("\n"));
         const result = await engine.execute(code);
         if (result.logs?.length) dbg("sandbox│log", result.logs.join("\n"));
-        if (result.ok) dbg("execute←", `ok  hint=${result.ok ? result.artifactHint ?? "text" : "-"}`, JSON.stringify(result.result)?.slice(0, 200));
+        if (result.ok) dbg("execute←", `ok  ui=${result.ui?.type ?? "none"}`, JSON.stringify(result.result)?.slice(0, 200));
         else dbg("execute←", `\x1b[31merror\x1b[0m`, result.error?.message);
         return result;
       },

@@ -2,6 +2,7 @@ import {
   buildCatalogue,
   generateDts,
   resolveConfig,
+  parseUiDescriptor,
   type EngineConfig,
   type Operation,
   type ResolvedConfig,
@@ -79,12 +80,14 @@ export async function createEngine(
       }
 
       // Extrait __ui si le sandbox l'a retourné, et isole .data comme résultat.
+      // Le __ui est une sortie LLM NON FIABLE : on la valide (règle dure §5) et
+      // on retombe sur l'inférence si elle est malformée.
       let data: unknown = raw.result;
       let ui: UiDescriptor | undefined;
       if (raw.result && typeof raw.result === "object" && !Array.isArray(raw.result)) {
         const obj = raw.result as Record<string, unknown>;
         if ("__ui" in obj) {
-          ui = obj.__ui as UiDescriptor;
+          ui = parseUiDescriptor(obj.__ui);
           data = "data" in obj ? obj.data : undefined;
         }
       }

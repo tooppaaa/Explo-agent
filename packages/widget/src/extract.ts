@@ -1,3 +1,4 @@
+import type { UIMessage } from "ai";
 import type { UiDescriptor } from "./ui-descriptor.js";
 
 interface UIPartLike {
@@ -7,13 +8,15 @@ interface UIPartLike {
   output?: unknown;
 }
 
-interface UIMessageLike {
-  role: string;
-  parts?: UIPartLike[];
+// Les parts du SDK `ai` sont une union taguée dynamique (`tool-${name}`) qui ne
+// se laisse pas narrower simplement. On les lit via cette forme structurelle :
+// le cast est confiné à l'accès `.parts` (pas au message entier).
+function parts(message: UIMessage): UIPartLike[] {
+  return (message.parts ?? []) as UIPartLike[];
 }
 
-export function extractText(message: UIMessageLike): string {
-  return (message.parts ?? [])
+export function extractText(message: UIMessage): string {
+  return parts(message)
     .filter((p) => p.type === "text" && typeof p.text === "string")
     .map((p) => p.text as string)
     .join("");
@@ -27,8 +30,8 @@ export interface ExecuteOutput {
   logs?: string[];
 }
 
-export function extractExecuteOutputs(message: UIMessageLike): ExecuteOutput[] {
-  return (message.parts ?? [])
+export function extractExecuteOutputs(message: UIMessage): ExecuteOutput[] {
+  return parts(message)
     .filter(
       (p) =>
         (p.type === "tool-execute" || p.type === "dynamic-tool") &&
