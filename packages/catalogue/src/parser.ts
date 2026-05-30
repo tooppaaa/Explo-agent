@@ -32,6 +32,7 @@ interface OpenAPIOperationObject {
     required?: boolean;
     content?: Record<string, { schema?: JsonSchema }>;
   };
+  responses?: Record<string, { content?: Record<string, { schema?: JsonSchema }> }>;
   ["x-mutating"]?: boolean;
 }
 
@@ -40,11 +41,23 @@ function slugify(method: string, path: string): string {
   return `${method}_${cleaned}`;
 }
 
-function tsTypeFromSchema(schema: JsonSchema | undefined): string {
+/** Profondeur max de récursion : protège contre les schémas (déréférencés)
+ * circulaires/auto-référents et borne la taille du type généré. */
+const MAX_TS_DEPTH = 8;
+
+function tsTypeFromSchema(schema: JsonSchema | undefined, depth = 0): string {
   if (!schema) return "unknown";
+  if (depth >= MAX_TS_DEPTH) return "unknown";
+
   if (schema.enum && schema.enum.length > 0) {
     return schema.enum.map((v) => JSON.stringify(v)).join(" | ");
   }
+
+  // Compositions OpenAPI : oneOf/anyOf → union, allOf → intersection.
+  if (schema.oneOf?.length) return schema.oneOf.map((s) => tsTypeFromSchema(s, depth + 1)).join(" | ");
+  if (schema.anyOf?.length) return schema.anyOf.map((s) => tsTypeFromSchema(s, depth + 1)).join(" | ");
+  if (schema.allOf?.length) return schema.allOf.map((s) => tsTypeFromSchema(s, depth + 1)).join(" & ");
+
   const type = Array.isArray(schema.type) ? schema.type.find((t) => t !== "null") : schema.type;
   switch (type) {
     case "string":
@@ -55,18 +68,37 @@ function tsTypeFromSchema(schema: JsonSchema | undefined): string {
     case "boolean":
       return "boolean";
     case "array":
-      return `${tsTypeFromSchema(schema.items)}[]`;
+      return `${tsTypeFromSchema(schema.items, depth + 1)}[]`;
     case "object": {
       if (!schema.properties) return "Record<string, unknown>";
       const fields = Object.entries(schema.properties).map(([k, v]) => {
         const optional = schema.required?.includes(k) ? "" : "?";
-        return `${k}${optional}: ${tsTypeFromSchema(v)}`;
+        return `${k}${optional}: ${tsTypeFromSchema(v, depth + 1)}`;
       });
       return `{ ${fields.join("; ")} }`;
     }
     default:
+      // Objet sans `type` mais avec des propriétés (fréquent en OpenAPI).
+      if (schema.properties) {
+        const fields = Object.entries(schema.properties).map(([k, v]) => {
+          const optional = schema.required?.includes(k) ? "" : "?";
+          return `${k}${optional}: ${tsTypeFromSchema(v, depth + 1)}`;
+        });
+        return `{ ${fields.join("; ")} }`;
+      }
       return "unknown";
   }
+}
+
+/** Extrait le type TS de la réponse de succès (2xx, sinon `default`). */
+function extractResponseType(op: OpenAPIOperationObject): string {
+  const responses = op.responses ?? {};
+  const key =
+    Object.keys(responses).find((k) => /^2\d\d$/.test(k)) ??
+    (responses.default ? "default" : undefined);
+  if (!key) return "unknown";
+  const schema = responses[key]?.content?.["application/json"]?.schema;
+  return tsTypeFromSchema(schema);
 }
 
 /**
@@ -75,8 +107,7 @@ function tsTypeFromSchema(schema: JsonSchema | undefined): string {
  */
 function buildArgs(
   op: OpenAPIOperationObject,
-  fullName: string,
-): { signature: string; schema: ZodTypeAny; params: ParamLocation[]; hasBody: boolean } {
+): { argsType: string; schema: ZodTypeAny; params: ParamLocation[]; hasBody: boolean } {
   const shape: Record<string, ZodTypeAny> = {};
   const sigFields: string[] = [];
   const params: ParamLocation[] = [];
@@ -103,10 +134,9 @@ function buildArgs(
   }
 
   const argsType = sigFields.length > 0 ? `{ ${sigFields.join("; ")} }` : "{}";
-  const signature = `${fullName}(args: ${argsType}): Promise<unknown>`;
   // Les args sont un objet ; vide → objet vide accepté.
   const schema = z.object(shape);
-  return { signature, schema, params, hasBody };
+  return { argsType, schema, params, hasBody };
 }
 
 export interface ParseOptions {
@@ -139,12 +169,15 @@ export async function buildCatalogue(
 
       const operationId = op.operationId ?? slugify(method, pathTemplate);
       const fullName = `${opts.providerName}.${operationId}`;
-      const { signature, schema, params, hasBody } = buildArgs(op, fullName);
+      const { argsType, schema, params, hasBody } = buildArgs(op);
+      const responseType = extractResponseType(op);
+      const signature = `${fullName}(args: ${argsType}): Promise<${responseType}>`;
 
       operations.push({
         name: fullName,
         description: op.summary ?? op.description ?? "",
         signature,
+        responseType,
         schema,
         mutating: false,
         provider: opts.providerName,

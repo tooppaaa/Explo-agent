@@ -34,6 +34,20 @@ describe("catalogue builder", () => {
     expect(listOrders.signature).toContain("status?: string");
   });
 
+  it("type la réponse depuis le schéma OpenAPI (plus de Promise<unknown>)", async () => {
+    const ops = await buildCatalogue(specPath, { providerName: "mock" });
+    const getOrder = ops.find((o) => o.name === "mock.getOrder")!;
+    // getOrder renvoie un Order : la réponse doit être typée, pas `unknown`.
+    expect(getOrder.responseType).not.toBe("unknown");
+    expect(getOrder.responseType).toContain("id: string");
+    expect(getOrder.responseType).toContain("total: number");
+    expect(getOrder.signature).toContain("): Promise<{");
+    // Le .d.ts doit refléter ce type de retour.
+    const dts = generateDts(ops);
+    expect(dts).toContain("getOrder(args:");
+    expect(dts).not.toContain("getOrder(args: { id: string }): Promise<unknown>");
+  });
+
   it("construit un schéma Zod qui valide les args et rejette les mauvais types", async () => {
     const ops = await buildCatalogue(specPath, { providerName: "mock" });
     const getOrder = ops.find((o) => o.name === "mock.getOrder")!;

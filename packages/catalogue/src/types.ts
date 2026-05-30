@@ -68,6 +68,8 @@ export interface Operation {
   description: string;
   /** Signature TS lisible (pour search). */
   signature: string;
+  /** Type TS de la réponse (succès 2xx), dérivé de l'OpenAPI. "unknown" si absent. */
+  responseType: string;
   /** Validation des args (params + requestBody) — Zod, côté hôte. */
   schema: ZodType;
   /** true si method ∈ {POST,PUT,PATCH,DELETE} (override possible: x-mutating). */
