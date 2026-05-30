@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { createApp } from "../packages/mock-api/src/server.js";
-import { createEngine, truncateResult, inferArtifactHint } from "../packages/mcp-server/src/index.js";
+import { createEngine, truncateResult, inferUiDescriptor } from "../packages/mcp-server/src/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const specPath = join(__dirname, "..", "packages", "mock-api", "openapi.yaml");
@@ -41,7 +41,7 @@ describe("createEngine — avec provider mock", () => {
     expect(results.length).toBeLessThanOrEqual(3);
   });
 
-  it("§10.3 — execute agrège, données brutes absentes, artifactHint chart", async () => {
+  it("§10.3 — execute agrège, infer ui bar-chart sur tableau numérique", async () => {
     const engine = await createEngine({
       providers: [{ name: "mock", openapi: specPath, baseUrl }],
     });
@@ -52,7 +52,7 @@ describe("createEngine — avec provider mock", () => {
     const res = await engine.execute(code);
     expect(res.ok).toBe(true);
     expect(Array.isArray(res.result)).toBe(true);
-    expect(res.artifactHint).toBe("chart");
+    expect(res.ui?.type).toBe("bar-chart");
   });
 
   it("génère un .d.ts décrivant la surface api", async () => {
@@ -78,14 +78,14 @@ describe("truncation (§10.8)", () => {
   });
 });
 
-describe("artifactHint", () => {
-  it("tableau d'objets numériques → chart", () => {
-    expect(inferArtifactHint([{ region: "EMEA", revenue: 100 }])).toBe("chart");
+describe("inferUiDescriptor", () => {
+  it("tableau d'objets numériques → bar-chart", () => {
+    expect(inferUiDescriptor([{ region: "EMEA", revenue: 100 }])?.type).toBe("bar-chart");
   });
   it("tableau d'objets non numériques → table", () => {
-    expect(inferArtifactHint([{ name: "a" }, { name: "b" }])).toBe("table");
+    expect(inferUiDescriptor([{ name: "a" }, { name: "b" }])?.type).toBe("table");
   });
-  it("valeur scalaire → text", () => {
-    expect(inferArtifactHint(42)).toBe("text");
+  it("valeur scalaire → undefined", () => {
+    expect(inferUiDescriptor(42)).toBeUndefined();
   });
 });

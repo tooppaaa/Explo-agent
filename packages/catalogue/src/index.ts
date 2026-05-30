@@ -1,4 +1,5 @@
 export * from "./types.js";
+export * from "./ui-descriptor.js";
 export { buildCatalogue, type ParseOptions } from "./parser.js";
 export { generateDts } from "./codegen.js";
 export {

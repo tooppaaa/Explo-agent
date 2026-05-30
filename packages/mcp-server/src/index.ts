@@ -7,4 +7,4 @@ export type {
 } from "./engine.js";
 export { buildMcpServer } from "./mcp.js";
 export { truncateResult } from "./truncate.js";
-export { inferArtifactHint, type ArtifactHint } from "./artifact-hint.js";
+export { inferUiDescriptor } from "./infer-ui.js";

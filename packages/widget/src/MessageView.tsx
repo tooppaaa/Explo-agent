@@ -1,9 +1,13 @@
 import type { UIMessage } from "ai";
-import { extractText, extractExecuteOutputs, toChartData } from "./extract.js";
-import { ChartBlock, TableBlock } from "./ChartBlock.js";
+import { extractText, extractExecuteOutputs } from "./extract.js";
+import { ArtifactRenderer } from "./ArtifactRenderer.js";
 
-/** Rend un message : texte + artifacts issus du tool execute. */
-export function MessageView({ message }: { message: UIMessage }) {
+interface Props {
+  message: UIMessage;
+  onAction: (msg: string) => void;
+}
+
+export function MessageView({ message, onAction }: Props) {
   const text = extractText(message as never);
   const outputs = extractExecuteOutputs(message as never);
 
@@ -18,14 +22,8 @@ export function MessageView({ message }: { message: UIMessage }) {
             </div>
           );
         }
-        const chart = out.artifactHint === "chart" ? toChartData(out.result) : null;
-        if (chart) return <ChartBlock key={i} data={chart} />;
-        if (
-          out.artifactHint === "table" &&
-          Array.isArray(out.result) &&
-          out.result.length > 0
-        ) {
-          return <TableBlock key={i} rows={out.result as Array<Record<string, unknown>>} />;
+        if (out.ui) {
+          return <ArtifactRenderer key={i} ui={out.ui} onAction={onAction} />;
         }
         return (
           <pre key={i} className="cme-result">

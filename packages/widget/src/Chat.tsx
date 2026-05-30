@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { MessageView } from "./MessageView.js";
@@ -23,6 +23,11 @@ export function Chat({ backendUrl, primary }: ChatProps) {
     void sendMessage({ text });
   };
 
+  const onAction = useCallback(
+    (msg: string) => { void sendMessage({ text: msg }); },
+    [sendMessage],
+  );
+
   return (
     <>
       <div className="cme-messages">
@@ -34,7 +39,7 @@ export function Chat({ backendUrl, primary }: ChatProps) {
           </div>
         )}
         {messages.map((m) => (
-          <MessageView key={m.id} message={m} />
+          <MessageView key={m.id} message={m} onAction={onAction} />
         ))}
       </div>
       {busy && <div className="cme-status">…le modèle réfléchit</div>}

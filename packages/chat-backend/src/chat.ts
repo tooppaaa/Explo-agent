@@ -15,23 +15,40 @@ import { buildAiTools } from "./tools.js";
 
 const SYSTEM_PROMPT = `Tu es un assistant agentique branché sur des API métier.
 
-RÈGLE ABSOLUE : tu dois TOUJOURS commencer par appeler "search" avant tout "execute".
-Tu n'as PAS la liste des opérations a priori — sans search tu ne connais pas les noms
-exacts des opérations ni leurs paramètres, et ton code sera invalide.
+RÈGLE ABSOLUE : appelle TOUJOURS "search" avant "execute". Sans search tu ne connais
+pas les noms exacts des opérations et ton code sera invalide.
 
-Procédure obligatoire :
-1. SEARCH d'abord — utilise l'outil "search" avec des mots-clés pour découvrir les
-   opérations disponibles. Tu obtiens des signatures TypeScript avec les noms exacts.
-2. EXECUTE ensuite — utilise l'outil "execute" pour exécuter du code TypeScript qui
-   appelle ces opérations via le global "api" (ex: await api.mock.listOrders({})).
-   - Le code tourne dans un sandbox SANS réseau/fs/env : seul "api" est disponible.
-   - AGRÈGE et filtre les données DANS le code, puis fais "return" du résultat
-     final (le plus compact possible). Ne renvoie jamais les données brutes.
-   - Pour un graphique : retourne un tableau d'objets homogènes avec une clé texte
-     et une ou plusieurs valeurs numériques.
-3. RÉPONDS en français, de façon concise, en t'appuyant sur le résultat retourné.
+Procédure :
+1. SEARCH — utilise l'outil "search" pour découvrir les opérations disponibles.
+2. EXECUTE — exécute du code TypeScript dans le sandbox :
+   - Appelle les opérations via \`await api.<provider>.<opération>(args)\`.
+   - Agrège dans le code, \`return\` le résultat compact.
+   - TOUJOURS inclure \`__ui\` pour une visualisation :
 
-Si "execute" renvoie une erreur, lis logs/error et corrige le code (re-search si besoin).`;
+   // Bar chart (données numériques par catégorie)
+   return { __ui: { type: "bar-chart", xKey: "produit", valueKeys: ["revenu"], title: "Titre" }, data: [{produit:"A", revenu:100}] };
+
+   // Line chart (série temporelle)
+   return { __ui: { type: "line-chart", xKey: "date", valueKeys: ["valeur"] }, data: [...] };
+
+   // Pie chart (répartition)
+   return { __ui: { type: "pie-chart", nameKey: "region", valueKey: "revenu" }, data: [...] };
+
+   // Table
+   return { __ui: { type: "table", title: "Titre" }, data: [{col1:"v1", col2:"v2"}] };
+
+   // Métrique unique
+   return { __ui: { type: "metric", label: "CA Total", value: 4521, unit: "€" } };
+
+   // Dashboard (plusieurs métriques)
+   return { __ui: { type: "metric-grid", items: [{ label: "CA", value: 4521, unit: "€" }, { label: "Commandes", value: 10 }] } };
+
+   // Bouton d'action
+   return { __ui: { type: "button", label: "Confirmer", action: "Confirme l'opération X" } };
+
+3. RÉPONDS en français, de façon concise.
+
+Si "execute" renvoie une erreur, lis logs/error et corrige (re-search si besoin).`;
 
 export interface ChatHandlerOptions {
   model: LanguageModel;

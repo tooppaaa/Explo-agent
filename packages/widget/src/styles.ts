@@ -46,4 +46,22 @@ export const WIDGET_CSS = `
 .cme-send { padding: 9px 14px; border: none; border-radius: 8px; color: #fff; cursor: pointer; }
 .cme-send:disabled { opacity: .5; cursor: default; }
 .cme-status { font-size: 12px; color: #6b7280; padding: 0 12px 8px; }
+
+.cme-chart-title { font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 4px; }
+
+.cme-metric-card {
+  background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 12px 16px; min-width: 100px;
+}
+.cme-metric-value { font-size: 22px; font-weight: 700; color: #111827; line-height: 1.2; }
+.cme-metric-unit { font-size: 13px; font-weight: 400; color: #6b7280; }
+.cme-metric-label { font-size: 11px; color: #6b7280; margin-top: 2px; }
+.cme-metric-grid { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+
+.cme-action-btn {
+  margin-top: 6px; padding: 9px 18px; border: none; border-radius: 8px;
+  background: #4f46e5; color: #fff; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: opacity .15s;
+}
+.cme-action-btn:hover { opacity: .85; }
 `;

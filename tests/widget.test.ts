@@ -3,7 +3,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   extractText,
   extractExecuteOutputs,
-  toChartData,
 } from "../packages/widget/src/extract.js";
 import { initAgent } from "../packages/widget/src/index.js";
 
@@ -28,30 +27,44 @@ describe("widget — extraction d'artifacts (purs)", () => {
         {
           type: "tool-execute",
           state: "output-available",
-          output: { ok: true, result: [{ region: "EMEA", revenue: 100 }], artifactHint: "chart" },
+          output: {
+            ok: true,
+            result: [{ region: "EMEA", revenue: 100 }],
+            ui: { type: "bar-chart", xKey: "region", valueKeys: ["revenue"], data: [{ region: "EMEA", revenue: 100 }] },
+          },
         },
       ],
     };
     const outs = extractExecuteOutputs(msg);
     expect(outs).toHaveLength(1);
-    expect(outs[0].artifactHint).toBe("chart");
+    expect(outs[0].ui?.type).toBe("bar-chart");
   });
 
-  it("toChartData mappe un tableau d'objets numériques vers des séries", () => {
-    const chart = toChartData([
-      { region: "EMEA", revenue: 100, orders: 3 },
-      { region: "AMER", revenue: 250, orders: 5 },
-    ]);
-    expect(chart).not.toBeNull();
-    expect(chart!.xKey).toBe("region");
-    expect(chart!.numericKeys.sort()).toEqual(["orders", "revenue"]);
-    expect(chart!.rows).toHaveLength(2);
+  it("extractExecuteOutputs gère un résultat metric", () => {
+    const msg = {
+      role: "assistant",
+      parts: [{
+        type: "tool-execute",
+        state: "output-available",
+        output: { ok: true, ui: { type: "metric", label: "CA", value: 4521, unit: "€" } },
+      }],
+    };
+    const outs = extractExecuteOutputs(msg);
+    expect(outs[0].ui?.type).toBe("metric");
   });
 
-  it("toChartData renvoie null pour un résultat non charteable", () => {
-    expect(toChartData("just text")).toBeNull();
-    expect(toChartData([{ name: "a" }, { name: "b" }])).toBeNull();
-    expect(toChartData([])).toBeNull();
+  it("extractExecuteOutputs retourne ok:false en cas d'erreur", () => {
+    const msg = {
+      role: "assistant",
+      parts: [{
+        type: "tool-execute",
+        state: "output-available",
+        output: { ok: false, error: { message: "timeout" } },
+      }],
+    };
+    const outs = extractExecuteOutputs(msg);
+    expect(outs[0].ok).toBe(false);
+    expect(outs[0].error?.message).toBe("timeout");
   });
 });
 
@@ -70,15 +83,11 @@ describe("widget — montage shadow DOM (§10.13)", () => {
     expect(host).toBeTruthy();
     expect(host.shadowRoot).toBeTruthy();
 
-    // Le launcher vit DANS le shadow root, pas dans le light DOM.
     expect(host.shadowRoot!.querySelector(".cme-launcher")).toBeTruthy();
     expect(document.querySelector(".cme-launcher")).toBeNull();
 
-    // Le CSS du widget est injecté dans le shadow, pas dans le document hôte.
     expect(host.shadowRoot!.querySelector("style")?.textContent).toContain(":host");
-    expect(document.head.querySelector("style")?.textContent ?? "").not.toContain(
-      "cme-launcher",
-    );
+    expect(document.head.querySelector("style")?.textContent ?? "").not.toContain("cme-launcher");
 
     handle.destroy();
     expect(document.querySelector("[data-code-mode-agent]")).toBeNull();
