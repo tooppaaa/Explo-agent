@@ -29,7 +29,10 @@ resource "aws_iam_role_policy" "execution_secrets" {
       Action = ["secretsmanager:GetSecretValue"]
       Resource = [
         aws_secretsmanager_secret.anthropic.arn,
+        aws_secretsmanager_secret.mistral.arn,
         aws_secretsmanager_secret.grimp.arn,
+        aws_secretsmanager_secret.langfuse_public.arn,
+        aws_secretsmanager_secret.langfuse_secret.arn,
       ]
     }]
   })

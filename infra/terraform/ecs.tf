@@ -31,10 +31,12 @@ resource "aws_ecs_task_definition" "explo" {
     portMappings = [{ containerPort = 3000, protocol = "tcp" }]
 
     environment = [
-      { name = "NODE_ENV",        value = "production" },
-      { name = "ENGINE_CONFIG",   value = "engine.config.prod.json" },
-      { name = "ALLOWED_ORIGIN",  value = var.allowed_origin },
-      { name = "CHAT_MODEL",      value = var.chat_model },
+      { name = "NODE_ENV",         value = "production" },
+      { name = "ENGINE_CONFIG",    value = "engine.config.prod.json" },
+      { name = "ALLOWED_ORIGIN",   value = var.allowed_origin },
+      { name = "CHAT_PROVIDER",    value = var.chat_provider },
+      { name = "CHAT_MODEL",       value = var.chat_model },
+      { name = "LANGFUSE_BASEURL", value = var.langfuse_baseurl },
     ]
 
     # Les secrets sont injectés depuis Secrets Manager — jamais dans l'image
@@ -44,8 +46,20 @@ resource "aws_ecs_task_definition" "explo" {
         valueFrom = aws_secretsmanager_secret.anthropic.arn
       },
       {
+        name      = "MISTRAL_API_KEY"
+        valueFrom = aws_secretsmanager_secret.mistral.arn
+      },
+      {
         name      = "GRIMP_API_KEY"
         valueFrom = aws_secretsmanager_secret.grimp.arn
+      },
+      {
+        name      = "LANGFUSE_PUBLIC_KEY"
+        valueFrom = aws_secretsmanager_secret.langfuse_public.arn
+      },
+      {
+        name      = "LANGFUSE_SECRET_KEY"
+        valueFrom = aws_secretsmanager_secret.langfuse_secret.arn
       },
     ]
 
