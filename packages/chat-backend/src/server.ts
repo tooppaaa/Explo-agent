@@ -1,6 +1,7 @@
 import { config as dotenv } from "dotenv";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 import { Readable } from "node:stream";
 import express, { type Express } from "express";
 import cors from "cors";
@@ -29,7 +30,10 @@ export function createChatApp(options: ChatServerOptions): Express {
   const handleChat = createChatHandler(options.engine, { model: options.model });
 
   const app = express();
-  app.use(cors());
+  // ALLOWED_ORIGIN restreint CORS au domaine de l'app hôte en prod.
+  // En dev (absent) : toutes origines autorisées.
+  const allowedOrigin = process.env.ALLOWED_ORIGIN;
+  app.use(cors(allowedOrigin ? { origin: allowedOrigin } : {}));
   app.use(express.json({ limit: "1mb" }));
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
@@ -110,8 +114,22 @@ if (isMain) {
   const modelId = process.env.CHAT_MODEL ?? defaultModel(provider);
   const port = Number(process.env.CHAT_PORT ?? 3000);
 
+  // Répertoire du bundle widget (construit par `pnpm build:widget`).
+  // En prod Docker, le Dockerfile le build avant de démarrer le serveur.
+  const widgetDist =
+    process.env.WIDGET_DIST ??
+    resolve(dirname(fileURLToPath(import.meta.url)), "../../../widget/dist");
+
   createEngine(config).then((engine) => {
     const app = createChatApp({ engine, model: resolveModel(provider, modelId) });
+
+    // Sert le bundle widget sur /widget/agent.js si le dossier dist existe.
+    // Permet d'embarquer le widget avec <script src="https://chat.example.com/widget/agent.js">.
+    if (existsSync(widgetDist)) {
+      app.use("/widget", express.static(widgetDist));
+      // eslint-disable-next-line no-console
+      console.log(`[chat-backend] widget served at /widget/agent.js (${widgetDist})`);
+    }
     const server = app.listen(port, () => {
       // eslint-disable-next-line no-console
       console.log(

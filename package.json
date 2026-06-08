@@ -10,7 +10,8 @@
     "dev:server": "tsx packages/mcp-server/src/server.ts",
     "dev:chat": "tsx packages/chat-backend/src/server.ts",
     "dev:widget": "pnpm --filter widget dev",
-    "build:widget": "pnpm --filter widget build"
+    "build:widget": "pnpm --filter widget build",
+    "start": "ENGINE_CONFIG=engine.config.prod.json tsx packages/chat-backend/src/server.ts"
   },
   "devDependencies": {
     "@ai-sdk/react": "^3.0.0",
