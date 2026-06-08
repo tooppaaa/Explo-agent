@@ -1,0 +1,77 @@
+name: Deploy to Fargate
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: eu-west-3
+
+jobs:
+  deploy:
+    name: Build → ECR → ECS
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # OIDC — pas besoin de stocker AWS_ACCESS_KEY_ID
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/explo-agent:$IMAGE_TAG \
+                       -t $ECR_REGISTRY/explo-agent:latest .
+          docker push $ECR_REGISTRY/explo-agent:$IMAGE_TAG
+          docker push $ECR_REGISTRY/explo-agent:latest
+          echo "image=$ECR_REGISTRY/explo-agent:$IMAGE_TAG" >> $GITHUB_OUTPUT
+        id: build
+
+      - name: Register new task definition
+        id: task-def
+        run: |
+          # Récupère la task def courante et remplace l'image
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition explo-agent \
+            --query 'taskDefinition' \
+            --output json)
+
+          NEW_TASK_DEF=$(echo $TASK_DEF | \
+            jq --arg img "${{ steps.build.outputs.image }}" \
+              '.containerDefinitions[0].image = $img' | \
+            jq 'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy,.placementConstraints)')
+
+          ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "arn=$ARN" >> $GITHUB_OUTPUT
+
+      - name: Update ECS service
+        run: |
+          aws ecs update-service \
+            --cluster explo-agent \
+            --service explo-agent \
+            --task-definition ${{ steps.task-def.outputs.arn }} \
+            --force-new-deployment
+
+          # Attend que la nouvelle task soit healthy (~2 min)
+          aws ecs wait services-stable \
+            --cluster explo-agent \
+            --services explo-agent
+
+      - name: Done
+        run: echo "✓ Deployed ${{ github.sha }} to https://chat.grimp.io"
