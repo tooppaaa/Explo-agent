@@ -34,9 +34,16 @@ export interface Engine {
   operations: Operation[];
   dts: string;
   search(query: string, k?: number): SearchResult;
-  execute(code: string): Promise<ExecuteResult>;
+  execute(code: string, ctx?: ExecutionContext): Promise<ExecuteResult>;
   /** Exécute la mutation stockée en attente (après confirmation utilisateur). */
-  confirmMutation(id: string): Promise<ExecuteResult>;
+  confirmMutation(id: string, ctx?: ExecutionContext): Promise<ExecuteResult>;
+}
+
+/** Contexte par requête pour le per-user auth.
+ *  tokenOverrides : clé = nom de la variable d'env du provider, valeur = token utilisateur.
+ *  Le token ne transite jamais dans le sandbox — il reste dans le HostBridge (côté serveur). */
+export interface ExecutionContext {
+  tokenOverrides?: Record<string, string>;
 }
 
 export interface CreateEngineOptions {
@@ -61,12 +68,16 @@ export async function createEngine(
   // Mode "direct" (config) : les mutations s'exécutent sans confirmation.
   // Mode "intent" (défaut) : elles sont bloquées → bouton de confirmation.
   const allowMutations = resolved.mutations.mode === "direct";
-  const bridge = new HttpHostBridge(operations, resolved.providers, {
-    fetchImpl: opts.fetchImpl,
-    allowMutations,
-  });
   const dts = generateDts(operations);
-  const pendingMutations = new Map<string, { code: string }>();
+  const pendingMutations = new Map<string, { code: string; ctx?: ExecutionContext }>();
+
+  function makeBridge(opts2: { allowMutations: boolean; ctx?: ExecutionContext }) {
+    return new HttpHostBridge(operations, resolved.providers, {
+      fetchImpl: opts.fetchImpl,
+      allowMutations: opts2.allowMutations,
+      tokenOverrides: opts2.ctx?.tokenOverrides,
+    });
+  }
 
   return {
     config: resolved,
@@ -78,7 +89,8 @@ export async function createEngine(
       return { results: searchBackend.query(query, bounded) };
     },
 
-    async execute(code: string): Promise<ExecuteResult> {
+    async execute(code: string, ctx?: ExecutionContext): Promise<ExecuteResult> {
+      const bridge = makeBridge({ allowMutations, ctx });
       const raw = await executor.execute(code, bridge, {
         timeoutMs: resolved.sandbox.timeoutMs,
         memoryMb: resolved.sandbox.memoryMb,
@@ -96,7 +108,7 @@ export async function createEngine(
               args: unknown;
             };
             const id = crypto.randomUUID();
-            pendingMutations.set(id, { code });
+            pendingMutations.set(id, { code, ctx });
             return {
               ok: false,
               logs: raw.logs,
@@ -144,17 +156,16 @@ export async function createEngine(
       };
     },
 
-    async confirmMutation(id: string): Promise<ExecuteResult> {
+    async confirmMutation(id: string, ctx?: ExecutionContext): Promise<ExecuteResult> {
       const pending = pendingMutations.get(id);
       if (!pending) {
         return { ok: false, error: { message: `Aucune mutation en attente avec l'identifiant "${id}".` } };
       }
       pendingMutations.delete(id);
 
-      const confirmBridge = new HttpHostBridge(operations, resolved.providers, {
-        fetchImpl: opts.fetchImpl,
-        allowMutations: true,
-      });
+      // ctx argument prend la priorité (ex. token frais du header HTTP) ;
+      // sinon on réutilise le ctx stocké lors du premier execute.
+      const confirmBridge = makeBridge({ allowMutations: true, ctx: ctx ?? pending.ctx });
 
       const raw = await executor.execute(pending.code, confirmBridge, {
         timeoutMs: resolved.sandbox.timeoutMs,

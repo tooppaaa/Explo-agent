@@ -1,7 +1,7 @@
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { trace } from "@opentelemetry/api";
-import type { Engine } from "mcp-server";
+import type { Engine, ExecutionContext } from "mcp-server";
 import { dbg } from "./debug.js";
 
 /**
@@ -19,7 +19,7 @@ function annotate(attrs: Record<string, string | number | boolean>): void {
  * câblés en in-process sur l'Engine. C'est la même logique que le serveur MCP
  * (PRD §7) ; le chat backend l'orchestre directement pour M0.
  */
-export function buildAiTools(engine: Engine): ToolSet {
+export function buildAiTools(engine: Engine, ctx?: ExecutionContext): ToolSet {
   return {
     search: tool({
       description:
@@ -53,7 +53,7 @@ export function buildAiTools(engine: Engine): ToolSet {
       }),
       execute: async ({ code }) => {
         dbg("llm→execute", "\n" + code.split("\n").map((l) => "  " + l).join("\n"));
-        const result = await engine.execute(code);
+        const result = await engine.execute(code, ctx);
         if (result.logs?.length) dbg("sandbox│log", result.logs.join("\n"));
         if (result.ok) dbg("execute←", `ok  ui=${result.ui?.type ?? "none"}`, JSON.stringify(result.result)?.slice(0, 200));
         else if (result.pendingMutation) dbg("execute←", `pending  op=${result.pendingMutation.opName}`);

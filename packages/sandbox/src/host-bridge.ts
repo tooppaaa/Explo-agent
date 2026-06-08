@@ -21,13 +21,13 @@ interface ResolvedAuth {
   apply(url: URL, headers: Record<string, string>): void;
 }
 
-function resolveAuth(provider: ApiProvider): ResolvedAuth {
+function resolveAuth(provider: ApiProvider, overrides: Record<string, string> = {}): ResolvedAuth {
   const auth = provider.auth ?? { type: "none" as const };
   switch (auth.type) {
     case "none":
       return { apply() {} };
     case "bearer": {
-      const token = process.env[auth.tokenEnv];
+      const token = overrides[auth.tokenEnv] ?? process.env[auth.tokenEnv];
       return {
         apply(_url, headers) {
           if (token) headers["authorization"] = `Bearer ${token}`;
@@ -35,7 +35,7 @@ function resolveAuth(provider: ApiProvider): ResolvedAuth {
       };
     }
     case "apiKey": {
-      const value = process.env[auth.valueEnv];
+      const value = overrides[auth.valueEnv] ?? process.env[auth.valueEnv];
       return {
         apply(url, headers) {
           if (!value) return;
@@ -58,6 +58,10 @@ export interface HostBridgeOptions {
   /** Permet l'exécution d'opérations mutantes (POST/PUT/PATCH/DELETE).
    *  false par défaut : les mutations sont bloquées jusqu'à confirmation (mode intent). */
   allowMutations?: boolean;
+  /** Surcharge les credentials par requête (auth per-user).
+   *  Clé = nom de la variable d'env du provider (ex. "GRIMP_API_KEY"), valeur = token.
+   *  Le credential ne transite jamais dans le sandbox — il reste ici dans le bridge. */
+  tokenOverrides?: Record<string, string>;
 }
 
 export class HttpHostBridge implements HostBridge {
@@ -73,7 +77,7 @@ export class HttpHostBridge implements HostBridge {
     for (const p of providerConfigs) {
       this.providers.set(p.name, {
         baseUrl: (p.baseUrl ?? "").replace(/\/$/, ""),
-        auth: resolveAuth(p),
+        auth: resolveAuth(p, opts.tokenOverrides),
       });
     }
   }

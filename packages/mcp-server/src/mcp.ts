@@ -1,13 +1,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Engine } from "./engine.js";
+import type { Engine, ExecutionContext } from "./engine.js";
 
 /**
  * Expose le moteur via MCP : exactement 2 tools, `search` et `execute`
  * (PRD §6.4, §6.5, §7). Le transport HTTP streamable est branché par le
  * chat backend ; ici on ne construit que le McpServer + ses tools.
  */
-export function buildMcpServer(engine: Engine): McpServer {
+export function buildMcpServer(engine: Engine, ctx?: ExecutionContext): McpServer {
   const server = new McpServer(
     { name: "code-mode-engine", version: "0.0.1" },
     { capabilities: { tools: {} } },
@@ -49,7 +49,7 @@ export function buildMcpServer(engine: Engine): McpServer {
       },
     },
     async ({ code }) => {
-      const res = await engine.execute(code);
+      const res = await engine.execute(code, ctx);
       return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
     },
   );

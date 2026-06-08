@@ -2,6 +2,7 @@ export { createEngine } from "./engine.js";
 export type {
   Engine,
   CreateEngineOptions,
+  ExecutionContext,
   SearchResult,
   ExecuteResult,
 } from "./engine.js";

@@ -7,7 +7,8 @@ import express, { type Express } from "express";
 import cors from "cors";
 import { anthropic } from "@ai-sdk/anthropic";
 import { createMistral } from "@ai-sdk/mistral";
-import { createEngine, type Engine } from "mcp-server";
+import { createEngine, buildMcpServer, type Engine } from "mcp-server";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { loadConfigFromFile, type EngineConfig } from "catalogue";
 import { createChatHandler } from "./chat.js";
 import { initTelemetry, shutdownTelemetry } from "./telemetry.js";
@@ -24,6 +25,14 @@ import type { LanguageModel, UIMessage } from "ai";
 export interface ChatServerOptions {
   engine: Engine;
   model: LanguageModel;
+}
+
+/** Extrait le token Bearer du header Authorization.
+ *  Retourne undefined si absent ou mal formé. */
+function extractBearer(authHeader: string | undefined): string | undefined {
+  if (!authHeader) return undefined;
+  const m = /^Bearer\s+(.+)$/i.exec(authHeader);
+  return m?.[1];
 }
 
 export function createChatApp(options: ChatServerOptions): Express {
@@ -45,7 +54,9 @@ export function createChatApp(options: ChatServerOptions): Express {
       return;
     }
     try {
-      const result = await options.engine.confirmMutation(id);
+      const token = extractBearer(req.headers.authorization);
+      const ctx = buildCtx(options.engine, token);
+      const result = await options.engine.confirmMutation(id, ctx);
       res.json(result);
     } catch (err) {
       res.status(500).json({ ok: false, error: { message: err instanceof Error ? err.message : String(err) } });
@@ -55,11 +66,43 @@ export function createChatApp(options: ChatServerOptions): Express {
   app.post("/chat", async (req, res) => {
     const messages = (req.body?.messages ?? []) as UIMessage[];
     const sessionId = typeof req.body?.id === "string" ? req.body.id : undefined;
-    const response = await handleChat(messages, { sessionId });
+    const token = extractBearer(req.headers.authorization);
+    const ctx = buildCtx(options.engine, token);
+    const response = await handleChat(messages, { sessionId, tokenOverrides: ctx?.tokenOverrides });
     await pipeWebResponse(response, res);
   });
 
+  // Endpoint MCP stateless (mode StreamableHTTP) — un serveur par requête.
+  // Auth : même mécanique que /chat — Bearer token → tokenOverrides dans le bridge.
+  app.post("/mcp", async (req, res) => {
+    const token = extractBearer(req.headers.authorization);
+    const ctx = buildCtx(options.engine, token);
+    const mcp = buildMcpServer(options.engine, ctx);
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    res.on("close", () => {
+      void transport.close();
+      void mcp.close();
+    });
+    await mcp.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  });
+
   return app;
+}
+
+/** Construit un ExecutionContext à partir du token Bearer et de la config engine. */
+function buildCtx(engine: Engine, token: string | undefined) {
+  if (!token) return undefined;
+  // Mappe le token sur tous les providers bearer ou apiKey de la config.
+  // Clé = tokenEnv / valueEnv du provider, valeur = token fourni par le client.
+  const overrides: Record<string, string> = {};
+  for (const p of engine.config.providers) {
+    const auth = p.auth;
+    if (!auth || auth.type === "none") continue;
+    if (auth.type === "bearer") overrides[auth.tokenEnv] = token;
+    else if (auth.type === "apiKey") overrides[auth.valueEnv] = token;
+  }
+  return Object.keys(overrides).length > 0 ? { tokenOverrides: overrides } : undefined;
 }
 
 function defaultModel(provider: string): string {

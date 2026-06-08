@@ -6,7 +6,7 @@ import {
   type UIMessage,
   type StopCondition,
 } from "ai";
-import type { Engine } from "mcp-server";
+import type { Engine, ExecutionContext } from "mcp-server";
 import { buildAiTools } from "./tools.js";
 import { SYSTEM_PROMPT } from "./prompt.js";
 import { isTelemetryEnabled } from "./telemetry.js";
@@ -24,6 +24,8 @@ export interface ChatHandlerOptions {
 export interface ChatRequestMeta {
   /** Identifiant de conversation pour regrouper les traces (observabilité). */
   sessionId?: string;
+  /** Token utilisateur à injecter dans le bridge — per-user auth. */
+  tokenOverrides?: Record<string, string>;
 }
 
 /** Arrête la boucle agentique dès qu'un execute a retourné pending_confirmation.
@@ -40,7 +42,6 @@ const hasPendingMutation: StopCondition<ReturnType<typeof buildAiTools>> = ({ st
 };
 
 export function createChatHandler(engine: Engine, opts: ChatHandlerOptions) {
-  const tools = buildAiTools(engine);
   const maxSteps = opts.maxSteps ?? 8;
   const telemetry = isTelemetryEnabled();
 
@@ -48,6 +49,8 @@ export function createChatHandler(engine: Engine, opts: ChatHandlerOptions) {
     messages: UIMessage[],
     meta: ChatRequestMeta = {},
   ): Promise<Response> {
+    const ctx: ExecutionContext | undefined = meta.tokenOverrides ? { tokenOverrides: meta.tokenOverrides } : undefined;
+    const tools = buildAiTools(engine, ctx);
     const result = streamText({
       model: opts.model,
       system: SYSTEM_PROMPT,
