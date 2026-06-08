@@ -5,12 +5,12 @@ variable "region" {
 
 variable "domain" {
   description = "Sous-domaine dédié à l'agent (enregistrement Route53 à créer)"
-  default     = "chat.grimp.io"
+  default     = "chat.grimp.app"
 }
 
 variable "allowed_origin" {
   description = "Origine CORS autorisée (frontend Grimp)"
-  default     = "https://app.grimp.io"
+  default     = "https://app.grimp.app"
 }
 
 variable "chat_model" {

@@ -26,7 +26,7 @@ resource "aws_lb_target_group" "explo" {
   }
 }
 
-# Certificat ACM pour chat.grimp.io — validation DNS via Route53
+# Certificat ACM pour chat.grimp.app — validation DNS via Route53
 resource "aws_acm_certificate" "explo" {
   domain_name       = var.domain
   validation_method = "DNS"
@@ -37,9 +37,9 @@ resource "aws_acm_certificate" "explo" {
 }
 
 # Enregistrements Route53 pour valider le certificat ACM
-# Note : chat.grimp.io spécifique bat le wildcard *.grimp.io de l'ALB existant.
+# Note : chat.grimp.app spécifique bat le wildcard *.grimp.app de l'ALB existant.
 data "aws_route53_zone" "grimp" {
-  name         = "grimp.io"
+  name         = "grimp.app"
   private_zone = false
 }
 
@@ -92,8 +92,8 @@ resource "aws_lb_listener" "https" {
   }
 }
 
-# Enregistrement Route53 : chat.grimp.io → ce nouvel ALB
-# Précède le wildcard *.grimp.io donc le trafic n'atteint pas l'ALB existant.
+# Enregistrement Route53 : chat.grimp.app → ce nouvel ALB
+# Précède le wildcard *.grimp.app donc le trafic n'atteint pas l'ALB existant.
 resource "aws_route53_record" "explo" {
   zone_id = data.aws_route53_zone.grimp.zone_id
   name    = var.domain

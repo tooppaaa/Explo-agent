@@ -74,4 +74,4 @@ jobs:
             --services explo-agent
 
       - name: Done
-        run: echo "✓ Deployed ${{ github.sha }} to https://chat.grimp.io"
+        run: echo "✓ Deployed ${{ github.sha }} to https://chat.grimp.app"
