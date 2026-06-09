@@ -3,6 +3,11 @@ variable "region" {
   default     = "eu-west-3" # Paris — ajuste selon ta localisation
 }
 
+variable "aws_profile" {
+  description = "Profil AWS CLI (aws sso login)"
+  default     = "default"
+}
+
 variable "domain" {
   description = "Sous-domaine dédié à l'agent (enregistrement Route53 à créer)"
   default     = "chat.grimp.app"
