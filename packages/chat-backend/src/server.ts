@@ -47,6 +47,13 @@ export function createChatApp(options: ChatServerOptions): Express {
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
+  app.get("/search", (req, res) => {
+    const q = typeof req.query.q === "string" ? req.query.q : "";
+    const k = req.query.k ? Number(req.query.k) : undefined;
+    const result = options.engine.search(q, k);
+    res.json({ query: q, count: result.results.length, results: result.results });
+  });
+
   app.post("/confirm", async (req, res) => {
     const id = typeof req.body?.id === "string" ? req.body.id : undefined;
     if (!id) {
