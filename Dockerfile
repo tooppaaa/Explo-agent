@@ -7,9 +7,10 @@ RUN apk add --no-cache curl unzip bash
 # Deno — binaire x86_64 épinglé (Fargate est toujours amd64)
 RUN curl -fsSL "https://github.com/denoland/deno/releases/download/v2.3.3/deno-x86_64-unknown-linux-gnu.zip" \
       -o /tmp/deno.zip \
-    && unzip -p /tmp/deno.zip deno > /usr/local/bin/deno \
+    && unzip /tmp/deno.zip -d /tmp/deno_bin \
+    && mv /tmp/deno_bin/deno /usr/local/bin/deno \
     && chmod +x /usr/local/bin/deno \
-    && rm /tmp/deno.zip \
+    && rm -rf /tmp/deno.zip /tmp/deno_bin \
     && deno --version
 
 ENV DENO_PATH=/usr/local/bin/deno
