@@ -68,10 +68,5 @@ jobs:
             --task-definition ${{ steps.task-def.outputs.arn }} \
             --force-new-deployment
 
-          # Attend que la nouvelle task soit healthy (~2 min)
-          aws ecs wait services-stable \
-            --cluster explo-agent \
-            --services explo-agent
-
       - name: Done
         run: echo "✓ Deployed ${{ github.sha }} to https://chat.grimp.app"
