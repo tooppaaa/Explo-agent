@@ -2,7 +2,7 @@ FROM node:20-alpine
 
 # Deno requis pour le sandbox (DenoWorkerExecutor lance `deno run` en sous-process).
 # Téléchargement direct du binaire — plus fiable que le script sur Alpine.
-RUN apk add --no-cache curl unzip bash
+RUN apk add --no-cache curl unzip bash gcompat
 
 # Deno — binaire x86_64 épinglé (Fargate est toujours amd64)
 RUN curl -fsSL "https://github.com/denoland/deno/releases/download/v2.3.3/deno-x86_64-unknown-linux-gnu.zip" \
