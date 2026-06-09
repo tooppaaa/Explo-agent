@@ -4,13 +4,12 @@ FROM node:20-alpine
 # Téléchargement direct du binaire — plus fiable que le script sur Alpine.
 RUN apk add --no-cache curl unzip bash
 
-# Deno — binaire x86_64 (Fargate est toujours amd64)
-# Builder avec --platform linux/amd64 depuis un Mac M1/M2/M3
-RUN curl -fsSL https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip \
+# Deno — binaire x86_64 épinglé (Fargate est toujours amd64)
+RUN curl -fsSL "https://github.com/denoland/deno/releases/download/v2.3.3/deno-x86_64-unknown-linux-gnu.zip" \
       -o /tmp/deno.zip \
-    && unzip /tmp/deno.zip -d /usr/local/bin \
-    && rm /tmp/deno.zip \
+    && unzip -p /tmp/deno.zip deno > /usr/local/bin/deno \
     && chmod +x /usr/local/bin/deno \
+    && rm /tmp/deno.zip \
     && deno --version
 
 ENV DENO_PATH=/usr/local/bin/deno
