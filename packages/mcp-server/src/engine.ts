@@ -59,8 +59,13 @@ export async function createEngine(
 
   const operations: Operation[] = [];
   for (const provider of resolved.providers) {
-    const ops = await buildCatalogue(provider.openapi, { providerName: provider.name });
-    operations.push(...ops);
+    try {
+      const ops = await buildCatalogue(provider.openapi, { providerName: provider.name });
+      operations.push(...ops);
+      console.info(`[engine] loaded ${ops.length} operations from "${provider.name}"`);
+    } catch (err) {
+      console.error(`[engine] failed to load catalogue for "${provider.name}":`, err);
+    }
   }
 
   const searchBackend: SearchBackend = createSearch(operations, resolved.search.topK);

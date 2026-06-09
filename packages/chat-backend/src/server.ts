@@ -170,16 +170,19 @@ if (isMain) {
     process.env.WIDGET_DIST ??
     resolve(dirname(fileURLToPath(import.meta.url)), "../../../widget/dist");
 
+  // Démarre le serveur HTTP immédiatement so /health répond pendant l'init engine.
+  // createEngine peut être lent (fetch OpenAPI distante) — ne pas bloquer le démarrage.
   createEngine(config).then((engine) => {
     const app = createChatApp({ engine, model: resolveModel(provider, modelId) });
 
     // Sert le bundle widget sur /widget/agent.js si le dossier dist existe.
-    // Permet d'embarquer le widget avec <script src="https://chat.example.com/widget/agent.js">.
     if (existsSync(widgetDist)) {
       app.use("/widget", express.static(widgetDist));
       // eslint-disable-next-line no-console
       console.log(`[chat-backend] widget served at /widget/agent.js (${widgetDist})`);
     }
+
+    // Démarre le serveur HTTP dès que l'engine est prêt.
     const server = app.listen(port, () => {
       // eslint-disable-next-line no-console
       console.log(
@@ -196,5 +199,9 @@ if (isMain) {
     };
     process.on("SIGTERM", shutdown);
     process.on("SIGINT", shutdown);
+  }).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error("[chat-backend] fatal: engine failed to initialize", err);
+    process.exit(1);
   });
 }
