@@ -1,11 +1,17 @@
 FROM node:20-alpine
 
 # Deno requis pour le sandbox (DenoWorkerExecutor lance `deno run` en sous-process).
-# Installation via le script officiel dans /usr/local/bin.
+# Téléchargement direct du binaire — plus fiable que le script sur Alpine.
 RUN apk add --no-cache curl unzip bash
-RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ]; then TARGET="deno-aarch64-unknown-linux-gnu"; \
+    else TARGET="deno-x86_64-unknown-linux-gnu"; fi && \
+    curl -fsSL "https://github.com/denoland/deno/releases/latest/download/${TARGET}.zip" \
+      -o /tmp/deno.zip && \
+    unzip /tmp/deno.zip -d /usr/local/bin && \
+    rm /tmp/deno.zip && \
+    chmod +x /usr/local/bin/deno
 ENV DENO_PATH=/usr/local/bin/deno
-ENV PATH=/usr/local/bin:$PATH
 
 # Vérifie que Deno est accessible
 RUN deno --version
