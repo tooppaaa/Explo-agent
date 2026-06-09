@@ -22,6 +22,7 @@ WORKDIR /app
 # Dépendances : copie d'abord les manifestes pour profiter du cache Docker
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages packages
+COPY engine.config.prod.json ./
 
 # Installe toutes les dépendances (tsx compris — utilisé comme runtime TypeScript)
 RUN pnpm install --frozen-lockfile
@@ -32,6 +33,7 @@ RUN pnpm build:widget
 
 EXPOSE 3000
 ENV NODE_ENV=production
+ENV ENGINE_CONFIG=engine.config.prod.json
 
 # Pas de build TypeScript séparé : tsx transpile à la volée dans le process Node.
 # Cela évite de gérer les symlinks pnpm workspace dans un build tsc multi-packages.
