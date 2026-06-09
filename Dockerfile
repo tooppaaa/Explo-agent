@@ -2,7 +2,7 @@ FROM node:20-slim
 
 # Deno requis pour le sandbox (DenoWorkerExecutor lance `deno run` en sous-process).
 # node:20-slim est Debian/glibc — compatible avec le binaire Deno glibc (linux-gnu).
-RUN apt-get update && apt-get install -y --no-install-recommends curl unzip \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Deno — binaire x86_64 épinglé (Fargate est toujours amd64)
