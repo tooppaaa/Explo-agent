@@ -1,8 +1,9 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 # Deno requis pour le sandbox (DenoWorkerExecutor lance `deno run` en sous-process).
-# Téléchargement direct du binaire — plus fiable que le script sur Alpine.
-RUN apk add --no-cache curl unzip bash gcompat
+# node:20-slim est Debian/glibc — compatible avec le binaire Deno glibc (linux-gnu).
+RUN apt-get update && apt-get install -y --no-install-recommends curl unzip \
+    && rm -rf /var/lib/apt/lists/*
 
 # Deno — binaire x86_64 épinglé (Fargate est toujours amd64)
 RUN curl -fsSL "https://github.com/denoland/deno/releases/download/v2.3.3/deno-x86_64-unknown-linux-gnu.zip" \
