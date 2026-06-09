@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Démo — code-mode-engine widget</title>
+    <style>
+      /* CSS HÔTE VOLONTAIREMENT AGRESSIF : si l'isolation shadow DOM
+         fonctionne, RIEN de ceci ne doit affecter le drawer/launcher. */
+      * { color: crimson !important; font-family: "Comic Sans MS", cursive; }
+      button { background: limegreen !important; border: 3px dashed purple !important; }
+      input { background: yellow !important; }
+      body { background: #fafafa; padding: 24px; }
+    </style>
+  </head>
+  <body>
+    <h1>Application hôte (CSS agressif)</h1>
+    <p>
+      Ce texte est en crimson + Comic Sans. Le bouton ci-dessous est vert à
+      bordure pourpre. Le widget en bas à droite ne doit hériter d'AUCUN de ces
+      styles (isolation shadow DOM — PRD §10.13).
+    </p>
+    <button>Bouton de l'app hôte</button>
+    <input placeholder="champ de l'app hôte" />
+
+    <script type="module">
+      import { initAgent } from "/src/index.tsx";
+      initAgent({
+        apiUrl: "demo",
+        backendUrl: "http://localhost:3000/chat",
+        launcher: { label: "Assistant ventes" },
+        theme: { primary: "#4f46e5" },
+      });
+    </script>
+  </body>
+</html>

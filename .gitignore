@@ -2,6 +2,8 @@ node_modules/
 dist/
 .env
 .env.local
+**/.env
+**/.env.local
 *.d.ts.generated
 coverage/
 .turbo/

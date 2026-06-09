@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Démo embed — bundle de production</title>
+    <style>
+      * { color: crimson !important; }
+      button { background: limegreen !important; }
+      body { padding: 24px; font-family: Georgia, serif; }
+    </style>
+  </head>
+  <body>
+    <h1>Intégration via &lt;script&gt; (bundle IIFE)</h1>
+    <p>
+      Exemple d'embarquement dans une page arbitraire. Lancer d'abord
+      <code>pnpm --filter widget build</code>, puis servir ce dossier.
+    </p>
+    <button>Bouton hôte</button>
+
+    <!-- Le bundle auto-montant expose window.initAgent -->
+    <script src="../dist/agent.js"></script>
+    <script>
+      window.initAgent({
+        apiUrl: "demo",
+        backendUrl: "http://localhost:3000/chat",
+        launcher: { label: "Assistant ventes" },
+      });
+    </script>
+  </body>
+</html>

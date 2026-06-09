@@ -1,0 +1,9 @@
+.git
+.claude
+node_modules
+# Les dist sont reconstruits dans le Dockerfile
+packages/widget/dist
+# Fichiers locaux
+.env
+.env.*
+*.log

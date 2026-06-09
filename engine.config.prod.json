@@ -1,0 +1,17 @@
+{
+  "providers": [
+    {
+      "name": "grimp",
+      "openapi": "https://api.grimp.app/partner/education/doc-json",
+      "baseUrl": "https://api.grimp.app",
+      "auth": {
+        "type": "bearer",
+        "tokenEnv": "GRIMP_API_KEY"
+      }
+    }
+  ],
+  "sandbox": { "runtime": "deno", "timeoutMs": 30000, "memoryMb": 128 },
+  "search": { "backend": "bm25", "topK": 8 },
+  "mutations": { "mode": "intent" },
+  "results": { "maxBytes": 32000 }
+}

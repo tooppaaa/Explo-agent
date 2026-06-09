@@ -1,0 +1,12 @@
+[
+  { "id": "o1", "customerId": "c1", "region": "EMEA", "status": "delivered", "total": 1499.9, "date": "2026-01-05", "items": [{ "productId": "p1", "qty": 10 }] },
+  { "id": "o2", "customerId": "c2", "region": "AMER", "status": "delivered", "total": 249.95, "date": "2026-01-09", "items": [{ "productId": "p2", "qty": 5 }] },
+  { "id": "o3", "customerId": "c3", "region": "AMER", "status": "shipped", "total": 899.97, "date": "2026-02-02", "items": [{ "productId": "p4", "qty": 3 }] },
+  { "id": "o4", "customerId": "c1", "region": "EMEA", "status": "delivered", "total": 179.98, "date": "2026-02-14", "items": [{ "productId": "p3", "qty": 2 }] },
+  { "id": "o5", "customerId": "c4", "region": "APAC", "status": "processing", "total": 399.9, "date": "2026-03-01", "items": [{ "productId": "p5", "qty": 10 }] },
+  { "id": "o6", "customerId": "c5", "region": "EMEA", "status": "delivered", "total": 2999.9, "date": "2026-03-12", "items": [{ "productId": "p4", "qty": 10 }] },
+  { "id": "o7", "customerId": "c2", "region": "AMER", "status": "cancelled", "total": 149.99, "date": "2026-03-20", "items": [{ "productId": "p1", "qty": 1 }] },
+  { "id": "o8", "customerId": "c3", "region": "AMER", "status": "delivered", "total": 599.98, "date": "2026-04-02", "items": [{ "productId": "p4", "qty": 2 }] },
+  { "id": "o9", "customerId": "c4", "region": "APAC", "status": "delivered", "total": 89.99, "date": "2026-04-10", "items": [{ "productId": "p3", "qty": 1 }] },
+  { "id": "o10", "customerId": "c1", "region": "EMEA", "status": "shipped", "total": 1199.92, "date": "2026-05-01", "items": [{ "productId": "p1", "qty": 8 }] }
+]

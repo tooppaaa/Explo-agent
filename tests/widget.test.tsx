@@ -1,0 +1,256 @@
+// @vitest-environment jsdom
+import { describe, it, expect, beforeEach } from "vitest";
+import { createRoot } from "react-dom/client";
+import { act } from "react-dom/test-utils";
+import {
+  extractText,
+  extractExecuteOutputs,
+  extractOrderedItems,
+  hasRenderableData,
+} from "../packages/widget/src/extract.js";
+import { initAgent } from "../packages/widget/src/index.js";
+import { ArtifactRenderer } from "../packages/widget/src/ArtifactRenderer.js";
+import { Markdown } from "../packages/widget/src/Markdown.js";
+import type { UiDescriptor } from "../packages/widget/src/ui-descriptor.js";
+
+describe("widget — extraction d'artifacts (purs)", () => {
+  it("extractText concatène les parts texte", () => {
+    const msg = {
+      role: "assistant",
+      parts: [
+        { type: "text", text: "Bonjour " },
+        { type: "step-start" },
+        { type: "text", text: "monde" },
+      ],
+    };
+    expect(extractText(msg)).toBe("Bonjour monde");
+  });
+
+  it("extractExecuteOutputs récupère les sorties du tool execute", () => {
+    const msg = {
+      role: "assistant",
+      parts: [
+        { type: "text", text: "voici" },
+        {
+          type: "tool-execute",
+          state: "output-available",
+          output: {
+            ok: true,
+            result: [{ region: "EMEA", revenue: 100 }],
+            ui: { type: "bar-chart", xKey: "region", valueKeys: ["revenue"], data: [{ region: "EMEA", revenue: 100 }] },
+          },
+        },
+      ],
+    };
+    const outs = extractExecuteOutputs(msg);
+    expect(outs).toHaveLength(1);
+    expect(outs[0].ui?.type).toBe("bar-chart");
+  });
+
+  it("extractExecuteOutputs gère un résultat metric", () => {
+    const msg = {
+      role: "assistant",
+      parts: [{
+        type: "tool-execute",
+        state: "output-available",
+        output: { ok: true, ui: { type: "metric", label: "CA", value: 4521, unit: "€" } },
+      }],
+    };
+    const outs = extractExecuteOutputs(msg);
+    expect(outs[0].ui?.type).toBe("metric");
+  });
+
+  it("extractOrderedItems conserve l'ordre texte / artifact / texte", () => {
+    const msg = {
+      role: "assistant",
+      parts: [
+        { type: "text", text: "Voici la répartition :" },
+        {
+          type: "tool-execute",
+          state: "output-available",
+          output: { ok: true, ui: { type: "pie-chart", nameKey: "t", valueKey: "v", data: [{ t: "a", v: 1 }] } },
+        },
+        { type: "text", text: "Le segment A domine." },
+      ],
+    };
+    const items = extractOrderedItems(msg);
+    expect(items.map((i) => i.kind)).toEqual(["text", "artifact", "text"]);
+    expect(items[0]).toMatchObject({ kind: "text", text: "Voici la répartition :" });
+    expect(items[1]).toMatchObject({ kind: "artifact" });
+    expect(items[2]).toMatchObject({ kind: "text", text: "Le segment A domine." });
+  });
+
+  it("hasRenderableData : false sur un chart/table sans données, true sinon", () => {
+    expect(hasRenderableData({ type: "pie-chart", nameKey: "t", valueKey: "v", data: [] })).toBe(false);
+    expect(hasRenderableData({ type: "bar-chart", xKey: "x", valueKeys: ["y"], data: [] })).toBe(false);
+    expect(hasRenderableData({ type: "table", data: [] })).toBe(false);
+    expect(hasRenderableData({ type: "pie-chart", nameKey: "t", valueKey: "v", data: [{ t: "a", v: 1 }] })).toBe(true);
+    expect(hasRenderableData({ type: "metric-grid", items: [] })).toBe(false);
+    // metric / button : pas de tableau de données → toujours affichables.
+    expect(hasRenderableData({ type: "metric", label: "CA", value: 1 })).toBe(true);
+    expect(hasRenderableData({ type: "button", label: "Go", action: "x" })).toBe(true);
+  });
+
+  it("extractExecuteOutputs retourne ok:false en cas d'erreur", () => {
+    const msg = {
+      role: "assistant",
+      parts: [{
+        type: "tool-execute",
+        state: "output-available",
+        output: { ok: false, error: { message: "timeout" } },
+      }],
+    };
+    const outs = extractExecuteOutputs(msg);
+    expect(outs[0].ok).toBe(false);
+    expect(outs[0].error?.message).toBe("timeout");
+  });
+
+  it("extractExecuteOutputs porte pendingMutation + bouton de confirmation", () => {
+    const msg = {
+      role: "assistant",
+      parts: [{
+        type: "tool-execute",
+        state: "output-available",
+        output: {
+          ok: false,
+          pendingMutation: { id: "abc-123", opName: "grimp.invite", args: {} },
+          ui: { type: "button", label: "Confirmer et exécuter", action: "__confirm:abc-123" },
+        },
+      }],
+    };
+    const outs = extractExecuteOutputs(msg);
+    expect(outs[0].pendingMutation?.id).toBe("abc-123");
+    expect(outs[0].ui?.type).toBe("button");
+    // Pas de message d'erreur "mutante" exposé à l'utilisateur.
+    expect(outs[0].error).toBeUndefined();
+  });
+});
+
+describe("widget — rendu GenUI (ArtifactRenderer)", () => {
+  let container: HTMLDivElement;
+  beforeEach(() => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  const renderUi = (ui: UiDescriptor) => {
+    const root = createRoot(container);
+    act(() => {
+      root.render(<ArtifactRenderer ui={ui} onAction={() => {}} />);
+    });
+    return root;
+  };
+
+  it("rend une métrique avec label et unité", () => {
+    renderUi({ type: "metric", label: "CA Total", value: 4521, unit: "€" });
+    expect(container.querySelector(".cme-metric-value")?.textContent).toContain("4521");
+    expect(container.textContent).toContain("CA Total");
+  });
+
+  it("rend un metric-grid avec plusieurs items", () => {
+    renderUi({
+      type: "metric-grid",
+      items: [
+        { label: "CA", value: 100 },
+        { label: "Commandes", value: 5 },
+      ],
+    });
+    expect(container.querySelectorAll(".cme-metric-card")).toHaveLength(2);
+  });
+
+  it("rend une table avec en-têtes et lignes", () => {
+    renderUi({ type: "table", data: [{ region: "EMEA", revenue: 100 }] });
+    const ths = [...container.querySelectorAll("th")].map((t) => t.textContent);
+    expect(ths).toEqual(["region", "revenue"]);
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(1);
+  });
+
+  it("rend un bouton d'action qui déclenche onAction", () => {
+    const root = createRoot(container);
+    let received = "";
+    act(() => {
+      root.render(
+        <ArtifactRenderer
+          ui={{ type: "button", label: "Confirmer", action: "go" }}
+          onAction={(m) => { received = m; }}
+        />,
+      );
+    });
+    const btn = container.querySelector(".cme-action-btn") as HTMLButtonElement;
+    expect(btn.textContent).toBe("Confirmer");
+    expect(btn.type).toBe("button");
+    act(() => { btn.click(); });
+    expect(received).toBe("go");
+  });
+
+  it("rend un bar-chart sans faire crasher la page", () => {
+    // Recharts ne peut pas mesurer le layout sous jsdom ; on vérifie surtout que
+    // l'ArtifactRenderer dégrade proprement (chart OU fallback boundary), jamais
+    // une exception non rattrapée qui tuerait tout le drawer.
+    renderUi({
+      type: "bar-chart",
+      data: [{ region: "EMEA", revenue: 100 }],
+      xKey: "region",
+      valueKeys: ["revenue"],
+    });
+    const ok = container.querySelector(".cme-chart") || container.querySelector(".cme-error");
+    expect(ok).toBeTruthy();
+  });
+
+  it("affiche un fallback (pas de crash) sur un type inconnu", () => {
+    renderUi({ type: "wtf" } as unknown as UiDescriptor);
+    expect(container.querySelector(".cme-error")).toBeTruthy();
+    expect(container.textContent).toContain("non supporté");
+  });
+
+  it("rend le markdown du texte (gras) en HTML sémantique", async () => {
+    (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(<Markdown>{"Voici un **résultat** important."}</Markdown>);
+    });
+    // Streamdown parse le markdown de façon asynchrone : on laisse passer un tick.
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(container.querySelector(".cme-md")).toBeTruthy();
+    expect(container.textContent).toContain("Voici un résultat important.");
+    // streamdown balise le gras via data-streamdown="strong" (span, pas <strong>).
+    expect(container.querySelector('[data-streamdown="strong"]')?.textContent).toBe("résultat");
+  });
+});
+
+describe("widget — montage shadow DOM (§10.13)", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  it("initAgent monte dans un shadow root, isolé du light DOM", async () => {
+    const handle = initAgent({ apiUrl: "http://api", backendUrl: "/chat" });
+    await tick();
+
+    const host = document.querySelector("[data-code-mode-agent]")!;
+    expect(host).toBeTruthy();
+    expect(host.shadowRoot).toBeTruthy();
+
+    expect(host.shadowRoot!.querySelector(".cme-launcher")).toBeTruthy();
+    expect(document.querySelector(".cme-launcher")).toBeNull();
+
+    expect(host.shadowRoot!.querySelector("style")?.textContent).toContain(":host");
+    expect(document.head.querySelector("style")?.textContent ?? "").not.toContain("cme-launcher");
+
+    handle.destroy();
+    expect(document.querySelector("[data-code-mode-agent]")).toBeNull();
+  });
+
+  it("ouvre le drawer au clic sur le launcher", async () => {
+    initAgent({ apiUrl: "http://api", backendUrl: "/chat" });
+    await tick();
+    const shadow = document.querySelector("[data-code-mode-agent]")!.shadowRoot!;
+    const launcher = shadow.querySelector(".cme-launcher") as HTMLButtonElement;
+    launcher.click();
+    await tick();
+    expect(shadow.querySelector(".cme-drawer")).toBeTruthy();
+    expect(shadow.querySelector(".cme-input")).toBeTruthy();
+  });
+});

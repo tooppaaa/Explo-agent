@@ -1,0 +1,233 @@
+openapi: 3.0.3
+info:
+  title: Sales Mock API
+  version: "1.0.0"
+  description: >
+    API de démonstration en lecture seule exposant des données de ventes,
+    commandes, produits et clients. Sert de cible publique pour le moteur
+    code-mode (M0).
+servers:
+  - url: http://localhost:3001
+paths:
+  /products:
+    get:
+      operationId: listProducts
+      summary: Liste les produits du catalogue
+      description: Retourne tous les produits, filtrables par catégorie.
+      parameters:
+        - name: category
+          in: query
+          required: false
+          description: Filtre par catégorie de produit (ex. "hardware", "software").
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste de produits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+  /customers:
+    get:
+      operationId: listCustomers
+      summary: Liste les clients
+      description: Retourne tous les clients, filtrables par région ou par palier (tier).
+      parameters:
+        - name: region
+          in: query
+          required: false
+          description: Filtre par région (EMEA, AMER, APAC).
+          schema:
+            type: string
+        - name: tier
+          in: query
+          required: false
+          description: Filtre par palier de compte (enterprise, smb).
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste de clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+  /orders:
+    post:
+      operationId: createOrder
+      summary: Crée une nouvelle commande
+      description: Crée une commande (mutante — requiert confirmation).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customerId:
+                  type: string
+                region:
+                  type: string
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/OrderItem"
+              required: [customerId, region, items]
+      responses:
+        "201":
+          description: Commande créée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+    get:
+      operationId: listOrders
+      summary: Liste les commandes
+      description: >
+        Retourne les commandes, filtrables par région, statut ou identifiant
+        client. Utile pour agréger le chiffre d'affaires.
+      parameters:
+        - name: region
+          in: query
+          required: false
+          description: Filtre par région (EMEA, AMER, APAC).
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          description: Filtre par statut (processing, shipped, delivered, cancelled).
+          schema:
+            type: string
+        - name: customerId
+          in: query
+          required: false
+          description: Filtre par identifiant client.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste de commandes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      summary: Récupère une commande par son identifiant
+      description: Retourne le détail d'une commande unique.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identifiant de la commande.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Détail de la commande
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          description: Commande introuvable
+  /sales/summary:
+    get:
+      operationId: getSalesSummary
+      summary: Résumé agrégé des ventes
+      description: >
+        Retourne le chiffre d'affaires agrégé par région sur les commandes
+        non annulées, avec le nombre de commandes.
+      parameters:
+        - name: region
+          in: query
+          required: false
+          description: Restreint l'agrégat à une région donnée.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Résumé des ventes par région
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SalesSummaryRow"
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        price:
+          type: number
+        stock:
+          type: integer
+      required: [id, name, category, price, stock]
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        region:
+          type: string
+        tier:
+          type: string
+        since:
+          type: string
+      required: [id, name, region, tier, since]
+    OrderItem:
+      type: object
+      properties:
+        productId:
+          type: string
+        qty:
+          type: integer
+      required: [productId, qty]
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+        customerId:
+          type: string
+        region:
+          type: string
+        status:
+          type: string
+        total:
+          type: number
+        date:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+      required: [id, customerId, region, status, total, date, items]
+    SalesSummaryRow:
+      type: object
+      properties:
+        region:
+          type: string
+        revenue:
+          type: number
+        orderCount:
+          type: integer
+      required: [region, revenue, orderCount]
