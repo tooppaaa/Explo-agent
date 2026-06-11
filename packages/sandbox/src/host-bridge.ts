@@ -138,7 +138,16 @@ export class HttpHostBridge implements HostBridge {
     const res = await this.fetchImpl(url.toString(), init);
     dbg("bridge←", `${res.status} (${Date.now() - t0}ms)`);
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status} from ${op.name}`);
+      // Le corps d'erreur (tronqué) est remonté au modèle pour qu'il puisse
+      // s'auto-corriger (param manquant, 404 sur un id…). Il vient de l'API
+      // cible — jamais de credential dedans côté requête.
+      let detail = "";
+      try {
+        detail = (await res.text()).slice(0, 600);
+      } catch {
+        /* corps illisible : on garde juste le status */
+      }
+      throw new Error(`HTTP ${res.status} from ${op.name}${detail ? `: ${detail}` : ""}`);
     }
     const contentType = res.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {

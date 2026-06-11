@@ -105,6 +105,13 @@ describe("DenoWorkerExecutor + HostBridge", () => {
     expect(after.result).toBe(7);
   });
 
+  it("remonte le corps de l'erreur HTTP au modèle (auto-correction)", async () => {
+    const bridge = makeBridge();
+    await expect(bridge.callOperation("mock.getOrder", { id: "does-not-exist" })).rejects.toThrow(
+      /HTTP 404 from mock\.getOrder: .*Order not found/,
+    );
+  });
+
   it("remonte une erreur du bridge (opération inconnue) sans crash", async () => {
     const res = await executor.execute(
       "return await api.mock.doesNotExist({});",
