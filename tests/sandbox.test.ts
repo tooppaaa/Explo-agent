@@ -28,7 +28,10 @@ beforeAll(async () => {
   ops = await buildCatalogue(specPath, { providerName: "mock" });
 });
 
-afterAll(() => server?.close());
+afterAll(() => {
+  server?.close();
+  executor.dispose();
+});
 
 function makeBridge() {
   return new HttpHostBridge(ops, [{ name: "mock", openapi: specPath, baseUrl }]);
@@ -110,5 +113,62 @@ describe("DenoWorkerExecutor + HostBridge", () => {
     );
     expect(res.ok).toBe(false);
     expect(res.error?.message).toMatch(/Unknown operation/i);
+  });
+});
+
+describe("pool de process Deno (réutilisation)", () => {
+  it("réutilise le même process pour des exécutions successives", async () => {
+    const pooled = new DenoWorkerExecutor();
+    try {
+      const r1 = await pooled.execute("return 1;", makeBridge(), execOpts);
+      const r2 = await pooled.execute("return 2;", makeBridge(), execOpts);
+      expect(r1.result).toBe(1);
+      expect(r2.result).toBe(2);
+      // Un seul `deno run` a été lancé pour les deux exécutions.
+      expect(pooled.stats().spawned).toBe(1);
+      expect(pooled.stats().idle).toBe(1);
+    } finally {
+      pooled.dispose();
+    }
+  });
+
+  it("aucun état ne fuit entre deux exécutions du même process (Worker frais)", async () => {
+    const pooled = new DenoWorkerExecutor();
+    try {
+      await pooled.execute("globalThis.leak = 'secret'; return 1;", makeBridge(), execOpts);
+      const res = await pooled.execute("return typeof globalThis.leak;", makeBridge(), execOpts);
+      expect(pooled.stats().spawned).toBe(1); // bien le MÊME process
+      expect(res.result).toBe("undefined");
+    } finally {
+      pooled.dispose();
+    }
+  });
+
+  it("un process en timeout interne reste sain ; un crash est remplacé", async () => {
+    const pooled = new DenoWorkerExecutor();
+    try {
+      const t = await pooled.execute("while (true) {}", makeBridge(), { timeoutMs: 500, memoryMb: 128 });
+      expect(t.ok).toBe(false);
+      // Le timeout interne tue le Worker, pas le process : il est réutilisé.
+      const after = await pooled.execute("return 7;", makeBridge(), execOpts);
+      expect(after.ok).toBe(true);
+      expect(after.result).toBe(7);
+      expect(pooled.stats().spawned).toBe(1);
+    } finally {
+      pooled.dispose();
+    }
+  });
+
+  it("exécutions concurrentes : pool borné, résultats corrects", async () => {
+    const pooled = new DenoWorkerExecutor({ maxProcs: 2 });
+    try {
+      const results = await Promise.all(
+        Array.from({ length: 5 }, (_, i) => pooled.execute(`return ${i};`, makeBridge(), execOpts)),
+      );
+      expect(results.map((r) => r.result)).toEqual([0, 1, 2, 3, 4]);
+      expect(pooled.stats().spawned).toBeLessThanOrEqual(2);
+    } finally {
+      pooled.dispose();
+    }
   });
 });

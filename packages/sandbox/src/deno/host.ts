@@ -7,12 +7,14 @@
  *     ⇅  postMessage
  *   Worker (permissions: "none") ← exécute le code utilisateur
  *
- * Lancé en one-shot : un process par exécution (aucune réutilisation d'état).
- * Lit un message `exec` sur stdin, exécute le code dans un worker isolé,
- * relaie chaque `api.*` vers Node, écrit le résultat final sur stdout, quitte.
+ * Process RÉUTILISABLE : il boucle sur stdin et accepte plusieurs messages
+ * `exec` successifs (pool côté Node — évite le cold start `deno run` à chaque
+ * exécution). L'isolation entre exécutions est garantie par le Worker : un
+ * Worker FRAIS est créé par exec et terminé après — aucun état utilisateur ne
+ * survit d'une exécution à l'autre. Ce process ne fait que coordonner
+ * stdin/stdout ↔ worker et ne détient aucun état sensible.
  *
- * Ce process n'a lui-même aucune permission : il ne peut ni lire le fs, ni le
- * réseau, ni l'env. Il ne fait que coordonner stdin/stdout ↔ worker.
+ * Il n'a lui-même aucune permission : ni fs, ni réseau, ni env.
  */
 import { WORKER_HARNESS_SOURCE } from "./worker-harness.ts";
 
@@ -50,7 +52,16 @@ async function* readMessages(): AsyncGenerator<NodeMessage> {
   }
 }
 
-function runWorker(exec: ExecMessage, onBridgeCall: (callId: string, name: string, args: unknown) => void) {
+interface RunningExec {
+  worker: Worker;
+  settled: boolean;
+}
+
+function runWorker(
+  exec: ExecMessage,
+  onBridgeCall: (callId: string, name: string, args: unknown) => void,
+  onDone: () => void,
+): RunningExec {
   const blob = new Blob([WORKER_HARNESS_SOURCE], { type: "application/javascript" });
   const url = URL.createObjectURL(blob);
   // Worker SANS aucune capacité : la seule sortie est postMessage.
@@ -60,10 +71,10 @@ function runWorker(exec: ExecMessage, onBridgeCall: (callId: string, name: strin
     deno: { permissions: "none" },
   });
 
-  let settled = false;
+  const running: RunningExec = { worker, settled: false };
   const finish = (result: unknown) => {
-    if (settled) return;
-    settled = true;
+    if (running.settled) return;
+    running.settled = true;
     clearTimeout(timer);
     try {
       worker.terminate();
@@ -72,8 +83,8 @@ function runWorker(exec: ExecMessage, onBridgeCall: (callId: string, name: strin
     }
     URL.revokeObjectURL(url);
     sendToNode(result);
-    // One-shot : on quitte proprement après le résultat.
-    Deno.exit(0);
+    // Process réutilisable : on N'EXIT PAS, on attend le prochain exec.
+    onDone();
   };
 
   // Timeout dur : termine le worker même sur boucle CPU (thread séparé).
@@ -109,20 +120,24 @@ function runWorker(exec: ExecMessage, onBridgeCall: (callId: string, name: strin
     });
   };
 
-  return worker;
+  return running;
 }
 
 async function main() {
-  let worker: Worker | null = null;
+  let current: RunningExec | null = null;
   for await (const msg of readMessages()) {
     if (msg.type === "exec") {
-      worker = runWorker(msg, (callId, name, args) => {
-        sendToNode({ type: "bridge-call", callId, name, args });
-      });
+      current = runWorker(
+        msg,
+        (callId, name, args) => sendToNode({ type: "bridge-call", callId, name, args }),
+        () => {
+          current = null;
+        },
+      );
       // Démarre l'exécution du code utilisateur.
-      worker.postMessage({ type: "run", code: msg.code });
-    } else if (msg.type === "bridge-result" && worker) {
-      worker.postMessage(msg);
+      current.worker.postMessage({ type: "run", code: msg.code });
+    } else if (msg.type === "bridge-result" && current && !current.settled) {
+      current.worker.postMessage(msg);
     }
   }
 }
