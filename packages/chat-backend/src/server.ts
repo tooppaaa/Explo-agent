@@ -12,6 +12,8 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { loadConfigFromFile, type EngineConfig } from "catalogue";
 import { createChatHandler } from "./chat.js";
 import { initTelemetry, shutdownTelemetry } from "./telemetry.js";
+import { extractBearer, requireAuth, resolveAuthMode, type AuthMode } from "./auth.js";
+import { rateLimit, type RateLimitOptions } from "./rate-limit.js";
 import type { LanguageModel, UIMessage } from "ai";
 
 /**
@@ -25,18 +27,26 @@ import type { LanguageModel, UIMessage } from "ai";
 export interface ChatServerOptions {
   engine: Engine;
   model: LanguageModel;
+  /** Défaut: AUTH_MODE env, sinon "required" si NODE_ENV=production. */
+  authMode?: AuthMode;
+  /** Défaut: RATE_LIMIT_MAX / RATE_LIMIT_WINDOW_MS env (30 req/min). */
+  rateLimit?: RateLimitOptions;
 }
 
-/** Extrait le token Bearer du header Authorization.
- *  Retourne undefined si absent ou mal formé. */
-function extractBearer(authHeader: string | undefined): string | undefined {
-  if (!authHeader) return undefined;
-  const m = /^Bearer\s+(.+)$/i.exec(authHeader);
-  return m?.[1];
-}
+/** Borne le nombre de messages d'une conversation envoyée à /chat :
+ *  garde-fou de coût LLM (l'historique complet est renvoyé à chaque tour). */
+const MAX_MESSAGES = 200;
 
 export function createChatApp(options: ChatServerOptions): Express {
   const handleChat = createChatHandler(options.engine, { model: options.model });
+  const authMode = options.authMode ?? resolveAuthMode();
+  const auth = requireAuth(authMode);
+  const limiter = rateLimit(
+    options.rateLimit ?? {
+      max: Number(process.env.RATE_LIMIT_MAX ?? 30),
+      windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60_000),
+    },
+  );
 
   const app = express();
   // ALLOWED_ORIGIN restreint CORS au domaine de l'app hôte en prod.
@@ -47,7 +57,7 @@ export function createChatApp(options: ChatServerOptions): Express {
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
-  app.post("/confirm", async (req, res) => {
+  app.post("/confirm", auth, limiter, async (req, res) => {
     const id = typeof req.body?.id === "string" ? req.body.id : undefined;
     if (!id) {
       res.status(400).json({ ok: false, error: { message: "id requis" } });
@@ -63,8 +73,12 @@ export function createChatApp(options: ChatServerOptions): Express {
     }
   });
 
-  app.post("/chat", async (req, res) => {
+  app.post("/chat", auth, limiter, async (req, res) => {
     const messages = (req.body?.messages ?? []) as UIMessage[];
+    if (!Array.isArray(messages) || messages.length > MAX_MESSAGES) {
+      res.status(400).json({ ok: false, error: { message: `messages invalide (max ${MAX_MESSAGES}).` } });
+      return;
+    }
     const sessionId = typeof req.body?.id === "string" ? req.body.id : undefined;
     const token = extractBearer(req.headers.authorization);
     const ctx = buildCtx(options.engine, token);
@@ -74,7 +88,8 @@ export function createChatApp(options: ChatServerOptions): Express {
 
   // Endpoint MCP stateless (mode StreamableHTTP) — un serveur par requête.
   // Auth : même mécanique que /chat — Bearer token → tokenOverrides dans le bridge.
-  app.post("/mcp", async (req, res) => {
+  // En mode "required", un client sans Bearer reçoit 401 + WWW-Authenticate.
+  app.post("/mcp", auth, limiter, async (req, res) => {
     const token = extractBearer(req.headers.authorization);
     const ctx = buildCtx(options.engine, token);
     const mcp = buildMcpServer(options.engine, ctx);

@@ -37,7 +37,7 @@ export function App({ config }: { config: ResolvedWidgetConfig }) {
               </button>
             </div>
           </div>
-          <Chat backendUrl={config.backendUrl} primary={config.theme.primary} />
+          <Chat backendUrl={config.backendUrl} primary={config.theme.primary} getToken={config.getToken} />
         </div>
       )}
     </>

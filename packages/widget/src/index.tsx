@@ -16,6 +16,10 @@ export interface InitAgentConfig {
   launcher?: { position?: "bottom-right" | "bottom-left"; label?: string };
   theme?: { primary?: string };
   mount?: "shadow" | "iframe"; // M0 : "shadow" uniquement.
+  /** Token utilisateur envoyé en `Authorization: Bearer` à /chat et /confirm.
+   *  Statique ou callback (rafraîchissable). Requis si le backend est en
+   *  AUTH_MODE=required. */
+  auth?: { token?: string | (() => string | Promise<string>) };
 }
 
 export interface ResolvedWidgetConfig {
@@ -23,9 +27,12 @@ export interface ResolvedWidgetConfig {
   backendUrl: string;
   launcher: { position: "bottom-right" | "bottom-left"; label: string };
   theme: { primary: string };
+  /** Résout le token courant (undefined = pas d'auth). */
+  getToken: () => Promise<string | undefined>;
 }
 
 function resolve(config: InitAgentConfig): ResolvedWidgetConfig {
+  const token = config.auth?.token;
   return {
     apiUrl: config.apiUrl,
     backendUrl: config.backendUrl ?? "/chat",
@@ -34,6 +41,7 @@ function resolve(config: InitAgentConfig): ResolvedWidgetConfig {
       label: config.launcher?.label ?? "Assistant",
     },
     theme: { primary: config.theme?.primary ?? "#4f46e5" },
+    getToken: async () => (typeof token === "function" ? await token() : token),
   };
 }
 

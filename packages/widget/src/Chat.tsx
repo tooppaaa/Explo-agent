@@ -7,6 +7,7 @@ import { MessageView } from "./MessageView.js";
 export interface ChatProps {
   backendUrl: string;
   primary: string;
+  getToken?: () => Promise<string | undefined>;
 }
 
 const SUGGESTIONS = [
@@ -30,10 +31,21 @@ function getToolStatus(messages: UIMessage[], busy: boolean): string | null {
   return "Traitement…";
 }
 
-export function Chat({ backendUrl, primary }: ChatProps) {
-  const { messages, sendMessage, status, setMessages } = useChat({
-    transport: new DefaultChatTransport({ api: backendUrl }),
-  });
+export function Chat({ backendUrl, primary, getToken }: ChatProps) {
+  // fetch enrichi : résout le token À CHAQUE requête (rafraîchissable) et
+  // l'injecte en Authorization. Utilisé par le transport useChat ET /confirm.
+  const authFetch = useCallback<typeof fetch>(
+    async (input, init) => {
+      const token = await getToken?.();
+      if (!token) return fetch(input, init);
+      const headers = new Headers(init?.headers);
+      headers.set("authorization", `Bearer ${token}`);
+      return fetch(input, { ...init, headers });
+    },
+    [getToken],
+  );
+  const [transport] = useState(() => new DefaultChatTransport({ api: backendUrl, fetch: authFetch }));
+  const { messages, sendMessage, status, setMessages } = useChat({ transport });
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -62,7 +74,7 @@ export function Chat({ backendUrl, primary }: ChatProps) {
   const handleConfirm = useCallback(async (id: string) => {
     const confirmUrl = backendUrl.replace(/\/chat$/, "/confirm");
     try {
-      const res = await fetch(confirmUrl, {
+      const res = await authFetch(confirmUrl, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id }),
@@ -91,7 +103,7 @@ export function Chat({ backendUrl, primary }: ChatProps) {
     } catch {
       /* confirm failed silently */
     }
-  }, [backendUrl, messages, setMessages]);
+  }, [backendUrl, messages, setMessages, authFetch]);
 
   const onAction = useCallback(
     (msg: string) => {

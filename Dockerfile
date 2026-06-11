@@ -31,6 +31,10 @@ RUN pnpm build:widget
 
 EXPOSE 3000
 ENV NODE_ENV=production
+# Auth obligatoire en prod : sans Bearer, /chat, /confirm et /mcp répondent 401
+# (sinon le credential de SERVICE servirait de fallback à quiconque atteint
+# l'ALB). Mettre AUTH_MODE=optional pour revenir à l'ancien comportement.
+ENV AUTH_MODE=required
 
 # Pas de build TypeScript séparé : tsx transpile à la volée dans le process Node.
 # Cela évite de gérer les symlinks pnpm workspace dans un build tsc multi-packages.
