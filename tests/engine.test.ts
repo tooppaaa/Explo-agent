@@ -121,6 +121,49 @@ describe("mutations (mode intent, §6)", () => {
     expect(res.ok).toBe(false);
     expect(res.error?.message).toContain("nope");
   });
+
+  it("confirmMutation rejoue UNIQUEMENT l'op mutante, pas les lectures du code", async () => {
+    // fetchImpl espion : compte les requêtes HTTP sortantes du bridge.
+    const calls: string[] = [];
+    const spyFetch: typeof fetch = async (input, init) => {
+      calls.push(`${init?.method ?? "GET"} ${new URL(String(input)).pathname}`);
+      return fetch(input, init);
+    };
+    const engine = await createEngine(
+      { providers: [{ name: "mock", openapi: specPath, baseUrl }] },
+      { fetchImpl: spyFetch },
+    );
+    const code = `
+      const orders = await api.mock.listOrders({});
+      const order = await api.mock.createOrder({ body: { customerId: "c1", region: "EMEA", items: [] } });
+      return order;
+    `;
+    const blocked = await engine.execute(code);
+    expect(blocked.pendingMutation?.opName).toBe("mock.createOrder");
+    const callsBeforeConfirm = calls.length;
+
+    const confirmed = await engine.confirmMutation(blocked.pendingMutation!.id);
+    expect(confirmed.ok).toBe(true);
+    // Une SEULE requête supplémentaire : le POST confirmé. La lecture
+    // listOrders du code n'est pas rejouée (pas de re-exécution du sandbox).
+    expect(calls.slice(callsBeforeConfirm)).toEqual(["POST /orders"]);
+  });
+
+  it("confirmMutation refuse un intent expiré (TTL)", async () => {
+    const engine = await createEngine({
+      providers: [{ name: "mock", openapi: specPath, baseUrl }],
+      mutations: { confirmTtlMs: 1 },
+    });
+    const code = `
+      return await api.mock.createOrder({ body: { customerId: "c1", region: "EMEA", items: [] } });
+    `;
+    const blocked = await engine.execute(code);
+    expect(blocked.pendingMutation).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 10));
+    const res = await engine.confirmMutation(blocked.pendingMutation!.id);
+    expect(res.ok).toBe(false);
+    expect(res.error?.message).toMatch(/inconnue ou expirée/);
+  });
 });
 
 describe("inferUiDescriptor", () => {

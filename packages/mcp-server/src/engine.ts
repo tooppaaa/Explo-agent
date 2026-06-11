@@ -69,7 +69,25 @@ export async function createEngine(
   // Mode "intent" (défaut) : elles sont bloquées → bouton de confirmation.
   const allowMutations = resolved.mutations.mode === "direct";
   const dts = generateDts(operations);
-  const pendingMutations = new Map<string, { code: string; ctx?: ExecutionContext }>();
+
+  // Intents en attente de confirmation (PRD §6.7) : on stocke l'OPÉRATION
+  // bloquée (nom + args), PAS le code du sandbox. À la confirmation, seul cet
+  // appel est rejoué via le bridge — jamais le code complet, qui pourrait
+  // refaire des lectures (TOCTOU) ou contenir d'autres mutations non montrées
+  // à l'utilisateur. TTL : un intent non confirmé expire.
+  interface PendingIntent {
+    opName: string;
+    args: unknown;
+    ctx?: ExecutionContext;
+    expiresAt: number;
+  }
+  const pendingMutations = new Map<string, PendingIntent>();
+
+  function prunePendingMutations(now: number) {
+    for (const [id, intent] of pendingMutations) {
+      if (intent.expiresAt <= now) pendingMutations.delete(id);
+    }
+  }
 
   function makeBridge(opts2: { allowMutations: boolean; ctx?: ExecutionContext }) {
     return new HttpHostBridge(operations, resolved.providers, {
@@ -77,6 +95,40 @@ export async function createEngine(
       allowMutations: opts2.allowMutations,
       tokenOverrides: opts2.ctx?.tokenOverrides,
     });
+  }
+
+  /** Extrait { __ui, data } d'un résultat sandbox (sortie LLM non fiable :
+   *  validée, fusion de data avant validation, fallback inférence), puis
+   *  tronque. Partagé par execute et confirmMutation. */
+  function interpretResult(rawResult: unknown, logs?: string[]): ExecuteResult {
+    let data: unknown = rawResult;
+    let ui: UiDescriptor | undefined;
+    if (rawResult && typeof rawResult === "object" && !Array.isArray(rawResult)) {
+      const obj = rawResult as Record<string, unknown>;
+      if ("__ui" in obj) {
+        data = "data" in obj ? obj.data : undefined;
+        // Le modèle renvoie le descripteur SANS `data` (passé séparément, cf.
+        // prompt). Les schémas chart/table EXIGENT `data` : il faut fusionner
+        // AVANT validation, sinon tout chart échoue et retombe sur l'inférence
+        // (un pie-chart demandé devenait un bar-chart). On valide ainsi le
+        // descripteur complet, data incluse — c'est ce que le widget rend.
+        const meta = obj.__ui;
+        const candidate =
+          meta && typeof meta === "object" && !Array.isArray(meta) && !("data" in meta) && data !== undefined
+            ? { ...(meta as Record<string, unknown>), data }
+            : meta;
+        ui = parseUiDescriptor(candidate);
+      }
+    }
+
+    const { value, truncated } = truncateResult(data, resolved.results.maxBytes);
+    return {
+      ok: true,
+      result: value,
+      logs,
+      ui: ui ?? inferUiDescriptor(value),
+      truncated,
+    };
   }
 
   return {
@@ -107,8 +159,15 @@ export async function createEngine(
               name: string;
               args: unknown;
             };
+            const now = Date.now();
+            prunePendingMutations(now);
             const id = crypto.randomUUID();
-            pendingMutations.set(id, { code, ctx });
+            pendingMutations.set(id, {
+              opName: blocked.name,
+              args: blocked.args,
+              ctx,
+              expiresAt: now + resolved.mutations.confirmTtlMs,
+            });
             return {
               ok: false,
               logs: raw.logs,
@@ -126,79 +185,35 @@ export async function createEngine(
       // Extrait __ui si le sandbox l'a retourné, et isole .data comme résultat.
       // Le __ui est une sortie LLM NON FIABLE : on la valide (règle dure §5) et
       // on retombe sur l'inférence si elle est malformée.
-      let data: unknown = raw.result;
-      let ui: UiDescriptor | undefined;
-      if (raw.result && typeof raw.result === "object" && !Array.isArray(raw.result)) {
-        const obj = raw.result as Record<string, unknown>;
-        if ("__ui" in obj) {
-          data = "data" in obj ? obj.data : undefined;
-          // Le modèle renvoie le descripteur SANS `data` (passé séparément, cf.
-          // prompt). Les schémas chart/table EXIGENT `data` : il faut fusionner
-          // AVANT validation, sinon tout chart échoue et retombe sur l'inférence
-          // (un pie-chart demandé devenait un bar-chart). On valide ainsi le
-          // descripteur complet, data incluse — c'est ce que le widget rend.
-          const meta = obj.__ui;
-          const candidate =
-            meta && typeof meta === "object" && !Array.isArray(meta) && !("data" in meta) && data !== undefined
-              ? { ...(meta as Record<string, unknown>), data }
-              : meta;
-          ui = parseUiDescriptor(candidate);
-        }
-      }
-
-      const { value, truncated } = truncateResult(data, resolved.results.maxBytes);
-      return {
-        ok: true,
-        result: value,
-        logs: raw.logs,
-        ui: ui ?? inferUiDescriptor(value),
-        truncated,
-      };
+      return interpretResult(raw.result, raw.logs);
     },
 
     async confirmMutation(id: string, ctx?: ExecutionContext): Promise<ExecuteResult> {
+      prunePendingMutations(Date.now());
       const pending = pendingMutations.get(id);
       if (!pending) {
-        return { ok: false, error: { message: `Aucune mutation en attente avec l'identifiant "${id}".` } };
+        return {
+          ok: false,
+          error: { message: `Aucune mutation en attente avec l'identifiant "${id}" (inconnue ou expirée).` },
+        };
       }
       pendingMutations.delete(id);
 
+      // Rejoue UNIQUEMENT l'opération confirmée par l'utilisateur — pas le code
+      // du sandbox. Les args sont exactement ceux montrés dans pendingMutation ;
+      // le bridge revalide (Zod) avant le HTTP.
       // ctx argument prend la priorité (ex. token frais du header HTTP) ;
       // sinon on réutilise le ctx stocké lors du premier execute.
       const confirmBridge = makeBridge({ allowMutations: true, ctx: ctx ?? pending.ctx });
-
-      const raw = await executor.execute(pending.code, confirmBridge, {
-        timeoutMs: resolved.sandbox.timeoutMs,
-        memoryMb: resolved.sandbox.memoryMb,
-      });
-
-      if (!raw.ok) {
-        return { ok: false, logs: raw.logs, error: raw.error };
+      try {
+        const value = await confirmBridge.callOperation(pending.opName, pending.args);
+        return interpretResult(value);
+      } catch (err) {
+        return {
+          ok: false,
+          error: { message: err instanceof Error ? err.message : String(err) },
+        };
       }
-
-      let data: unknown = raw.result;
-      let ui: UiDescriptor | undefined;
-      if (raw.result && typeof raw.result === "object" && !Array.isArray(raw.result)) {
-        const obj = raw.result as Record<string, unknown>;
-        if ("__ui" in obj) {
-          data = "data" in obj ? obj.data : undefined;
-          const meta = obj.__ui;
-          const candidate =
-            meta && typeof meta === "object" && !Array.isArray(meta) && !("data" in meta) && data !== undefined
-              ? { ...(meta as Record<string, unknown>), data }
-              : meta;
-          ui = parseUiDescriptor(candidate);
-        }
-      }
-
-      const { value, truncated } = truncateResult(data, resolved.results.maxBytes);
-      return {
-        ok: true,
-        result: value,
-        logs: raw.logs,
-        ui: ui ?? inferUiDescriptor(value),
-        truncated,
-      };
     },
   };
 }

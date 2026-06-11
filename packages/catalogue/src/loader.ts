@@ -42,7 +42,10 @@ const engineConfigSchema = z.object({
     })
     .optional(),
   mutations: z
-    .object({ mode: z.enum(["intent", "direct"]).optional() })
+    .object({
+      mode: z.enum(["intent", "direct"]).optional(),
+      confirmTtlMs: z.number().int().positive().optional(),
+    })
     .optional(),
   results: z
     .object({ maxBytes: z.number().int().positive().optional() })
@@ -57,7 +60,7 @@ export interface ResolvedConfig {
     memoryMb: number;
   };
   search: { backend: "bm25" | "embeddings"; topK: number };
-  mutations: { mode: "intent" | "direct" };
+  mutations: { mode: "intent" | "direct"; confirmTtlMs: number };
   results: { maxBytes: number };
   /** embeddingsFn ne transite pas par le fichier ; injectée programmatiquement. */
   embeddingsFn?: (texts: string[]) => Promise<number[][]>;
@@ -66,7 +69,7 @@ export interface ResolvedConfig {
 const DEFAULTS = {
   sandbox: { runtime: "deno" as const, timeoutMs: 30000, memoryMb: 128 },
   search: { backend: "bm25" as const, topK: 8 },
-  mutations: { mode: "intent" as const },
+  mutations: { mode: "intent" as const, confirmTtlMs: 10 * 60_000 },
   results: { maxBytes: 32_000 },
 };
 
@@ -83,7 +86,10 @@ export function resolveConfig(config: EngineConfig = {}): ResolvedConfig {
       backend: config.search?.backend ?? DEFAULTS.search.backend,
       topK: config.search?.topK ?? DEFAULTS.search.topK,
     },
-    mutations: { mode: config.mutations?.mode ?? DEFAULTS.mutations.mode },
+    mutations: {
+      mode: config.mutations?.mode ?? DEFAULTS.mutations.mode,
+      confirmTtlMs: config.mutations?.confirmTtlMs ?? DEFAULTS.mutations.confirmTtlMs,
+    },
     results: {
       maxBytes: config.results?.maxBytes ?? DEFAULTS.results.maxBytes,
     },

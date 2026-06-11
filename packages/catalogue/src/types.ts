@@ -36,7 +36,11 @@ export interface EngineConfig {
     topK?: number; // défaut: 8
     embeddingsFn?: (texts: string[]) => Promise<number[][]>;
   };
-  mutations?: { mode?: "intent" | "direct" }; // défaut: "intent"
+  mutations?: {
+    mode?: "intent" | "direct"; // défaut: "intent"
+    /** Durée de validité d'une mutation en attente de confirmation. Défaut: 10 min. */
+    confirmTtlMs?: number;
+  };
   results?: { maxBytes?: number }; // défaut: 32_000
 }
 
