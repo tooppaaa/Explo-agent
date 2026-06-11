@@ -75,11 +75,48 @@ Le LLM recherche les opérations disponibles, écrit du code dans le sandbox, ap
 | `CHAT_MODEL` | Non | `claude-sonnet-4-5` | Modèle Anthropic à utiliser |
 | `ENGINE_CONFIG` | Non | `engine.config.json` | Chemin vers la config providers |
 | `MOCK_API_PORT` | Non | `3001` | Port de l'API mock |
+| `AUTH_MODE` | Non | `required` si `NODE_ENV=production`, sinon `optional` | `required` : 401 sans `Authorization: Bearer` sur `/chat`, `/confirm`, `/mcp` |
+| `RATE_LIMIT_MAX` | Non | `30` | Requêtes max par IP par fenêtre (0 = désactivé) |
+| `RATE_LIMIT_WINDOW_MS` | Non | `60000` | Taille de la fenêtre du rate limiting |
+| `ALLOWED_ORIGIN` | Non | toutes | Restreint CORS au domaine de l'app hôte |
+
+## Sécurité des endpoints
+
+Le Bearer token reçu sur `/chat`, `/confirm` et `/mcp` est mappé sur les providers
+configurés (`tokenOverrides`) : chaque utilisateur appelle l'API métier avec **son**
+credential, qui ne transite jamais dans le sandbox. Sans token, le moteur retombe
+sur le credential de **service** lu dans l'env — c'est pourquoi, en production
+(`AUTH_MODE=required`), les requêtes sans Bearer sont refusées (401 +
+`WWW-Authenticate`).
+
+Côté widget :
+
+```js
+window.initAgent({
+  backendUrl: "https://your-chat-backend/chat",
+  auth: { token: () => myApp.getUserApiKey() },   // statique ou callback
+});
+```
+
+### Brancher le serveur MCP dans Claude (ou un autre client)
+
+L'endpoint `POST /mcp` parle StreamableHTTP standard. Deux options :
+
+1. **Bearer statique** (simple, recommandé pour démarrer) : générer un token par
+   utilisateur/intégration et le passer en header. Exemple avec Claude Code :
+   `claude mcp add --transport http code-mode https://…/mcp --header "Authorization: Bearer <token>"`.
+   Fonctionne avec tout client MCP qui supporte les headers personnalisés.
+2. **OAuth 2.1** (requis pour les connecteurs claude.ai grand public) : la spec MCP
+   attend un Authorization Server (PKCE + Dynamic Client Registration). Plutôt que
+   de l'implémenter soi-même, mettre l'endpoint derrière un proxy OAuth (Cloudflare
+   `workers-oauth-provider`, Auth0, Stytch…) qui échange le grant contre le Bearer
+   attendu ici. Le 401 renvoie déjà `WWW-Authenticate: Bearer`, point d'entrée du
+   flow de découverte côté client.
 
 ## Tests
 
 ```bash
-pnpm test          # 61 tests (vitest) — requiert Deno installé
+pnpm test          # suite complète (vitest) — requiert Deno installé
 pnpm typecheck     # vérification TypeScript (tsc --noEmit)
 ```
 

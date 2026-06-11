@@ -265,7 +265,40 @@ window.initAgent({
 - **M6** — Widget : bundle `initAgent`, drawer, `useChat`, rendu des artifacts (chart/table/text/action).
 - **M7** — Limites de résultat, embeddings optionnels, Dockerfile, durcissement sécurité, suite d'intégration.
 
-## 12. Questions ouvertes
+## 12. Annexe — écarts d'implémentation actés (v1 livrée)
+
+L'implémentation a évolué au-delà de la v2 de ce document. Écarts **actés**
+(le code fait foi ; cette annexe les documente pour éviter le drift) :
+
+1. **`artifactHint` → descripteurs `__ui`** (§6.5) : le sandbox peut retourner
+   `{ __ui, data }` (bar-chart, line-chart, pie-chart, table, metric,
+   metric-grid, button). Le `__ui` est une sortie LLM non fiable : validé Zod
+   côté moteur, fallback sur une inférence heuristique. Le widget rend le
+   descripteur, pas un simple hint.
+2. **Intents de mutation** (§6.7) : `pendingIntents[]` + `POST /confirm {ids}`
+   sont devenus `pendingMutation` (singulier) + `POST /confirm {id}`. Le moteur
+   stocke l'**opération bloquée** (`opName` + `args`, TTL `mutations.confirmTtlMs`,
+   défaut 10 min) et la confirmation rejoue UNIQUEMENT cet appel via le bridge —
+   jamais le code sandbox. Le bouton de confirmation est émis par le moteur
+   (`ui: { type: "button", action: "__confirm:<id>" }`), pas par le modèle.
+   Limite connue : stockage en mémoire par instance (multi-task = sticky
+   sessions ou store partagé à prévoir).
+3. **Token utilisateur** (§4) : plus totalement reporté. Un Bearer par requête
+   (`/chat`, `/confirm`, `/mcp`) surcharge le credential de service
+   (`tokenOverrides` dans le HostBridge ; jamais visible du sandbox). Le widget
+   accepte `initAgent({ auth: { token } })`. En production, `AUTH_MODE=required`
+   refuse les requêtes sans Bearer (401 + `WWW-Authenticate`) ; un rate limiting
+   par IP protège le coût LLM.
+4. **Chat backend et MCP** (§7) : le chat backend consomme l'Engine in-process
+   (tools au format Vercel AI SDK) ; l'interface MCP (StreamableHTTP stateless)
+   est une façade parallèle sur le même Engine, exposée en serveur autonome et
+   sur `/mcp` du chat backend.
+5. **Sandbox** (§6.6) : les process `deno run` (zéro permission) sont poolés et
+   réutilisés ; l'isolation par exécution reste garantie par un Worker
+   `permissions:none` frais par exec. `isolated-vm` n'est pas encore implémenté
+   (§10.9 en attente).
+
+## 13. Questions ouvertes
 
 - Montage du widget : **shadow DOM** (léger, intégration souple) vs **iframe** (isolation maximale, plus rigide) — trancher le défaut.
 - Lib de charts pour le rendu côté widget (Recharts, Chart.js, autre).
